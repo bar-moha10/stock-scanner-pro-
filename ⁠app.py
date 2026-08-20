@@ -25,7 +25,6 @@ HEBREW_TICKERS = {
     "אלביט": "ESLT.TA"
 }
 
-# רשימת המניות להשלמה אוטומטית בחיפוש
 SEARCH_OPTIONS = [
     "",
     "בזק",
@@ -96,7 +95,6 @@ def analyze_ticker(user_input, period="6mo"):
     if not raw_live_price or df.empty:
         return None, f"לא נמצאו נתונים עבור '{user_input}'."
 
-    # טיפול בנרמול מניות ישראליות (שקלים מול אגורות)
     if is_israeli:
         price_ils = raw_live_price / 100.0 if raw_live_price > 50 else raw_live_price
         price_agorot = price_ils * 100.0
@@ -114,14 +112,12 @@ def analyze_ticker(user_input, period="6mo"):
         prefix = "$"
         history_df = df[['Close', 'High', 'Low']].copy()
 
-    # RSI
     delta = history_df['Close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
     rs = gain / loss
     rsi = float((100 - (100 / (1 + rs))).iloc[-1]) if not loss.empty and loss.iloc[-1] != 0 else 50.0
 
-    # ATR
     high_low = history_df['High'] - history_df['Low']
     atr = float(high_low.rolling(14).mean().iloc[-1]) if len(high_low) >= 14 else calc_price * 0.02
 
@@ -170,16 +166,16 @@ def plot_interactive_chart(df, ticker, prefix):
             showgrid=True, 
             zeroline=False, 
             fixedrange=True,
-            showspikes=True,       # 📍 קו סמן אנכי באצבע
+            showspikes=True,
             spikethickness=1.5,
-            spikecolor="#e63946", # צבע אדום
+            spikecolor="#e63946",
             spikemode="across"
         ),
         yaxis=dict(
             showgrid=True, 
             zeroline=False, 
             fixedrange=True,
-            showspikes=True,       # 📍 קו סמן אופקי באצבע
+            showspikes=True,
             spikethickness=1.5,
             spikecolor="#e63946",
             spikemode="across"
@@ -190,7 +186,6 @@ def plot_interactive_chart(df, ticker, prefix):
 if check_password():
     st.title("📈 Stock Scanner Pro")
     
-    # ⚙️ סרגל צד לטווח זמן
     st.sidebar.header("⚙️ הגדרות תצוגה")
     selected_period = st.sidebar.select_slider(
         "טווח זמן לגרפים:",
@@ -199,7 +194,6 @@ if check_password():
         format_func=lambda x: {"1mo": "חודש", "3mo": "3 חודשים", "6mo": "חצי שנה", "1y": "שנה"}[x]
     )
 
-    # 🔍 אזור חיפוש עם השלמה אוטומטית
     st.subheader("🔍 חיפוש וניתוח מניה ספציפית")
     col_search1, col_search2 = st.columns([3, 1])
     
@@ -208,7 +202,7 @@ if check_password():
             "הקלד שם מניה או סימול (למשל: ב...):",
             options=SEARCH_OPTIONS,
             index=0,
-            help="התחל להקליד אות בעברית או באנגלית לקבלת הצעות חיפוש"
+            help="התחל להקליד אות לקבלת הצעות חיפוש"
         )
     
     with col_search2:
@@ -225,31 +219,12 @@ if check_password():
                 st.success(f"תוצאות ניתוח עבור {res['מניה']}:")
                 c1, c2 = st.columns([1, 2])
                 with c1:
-                    st.metric(
-                        "מחיר עדכני", 
-                        res['מחיר עדכני'], 
-                        help="המחיר המעודכן ביותר שנלקח בזמן אמת (במניות ישראליות מציג שקלים ואגורות)."
-                    )
-                    st.write(
-                        f"**מדד RSI:** {res['RSI']}", 
-                        help="מדד עוצמה יחסית (1-100). מתחת ל-30 מצביע על מכירת יתר/מציאה, מעל 70 על קניית יתר, ובין 50 ל-60 מראה על מומנטום חיובי של קונים."
-                    )
-                    st.write(
-                        f"**מחיר יעד (Take Profit):** {res['מחיר יעד']}", 
-                        help="המחיר המשוער שבו מומלץ למכור את המניה ולקחת רווח (מחושב לפי תנודתיות ה-ATR)."
-                    )
-                    st.write(
-                        f"**קץ סיכון (Stop Loss):** {res['סטופ לוס']}", 
-                        help="מחיר הגנה לחיתוך הפסד. אם המניה יורדת מתחת למחיר זה, מומלץ לצאת כדי למנוע הפסדים כבדים."
-                    )
-                    st.write(
-                        f"**פוטנציאל רווח:** {res['פוטנציאל רווח (%)']}%", 
-                        help="אחוז הרווח המשוער מהמחיר הנוכחי ועד למחיר היעד."
-                    )
-                    st.write(
-                        f"**יחס סיכוי/סיכון:** {res['יחס סיכוי/סיכון']}", 
-                        help="היחס בין הרווח הפוטנציאלי להפסד האפשרי. יחס של 2.0 ומעלה נחשב לעסקה מצוינת (מרוויחים פי 2 ממה שמסכנים)."
-                    )
+                    st.metric("מחיר עדכני", res['מחיר עדכני'], help="מחיר בזמן אמת מהבורסה (שקלים/אגורות למניות ישראליות).")
+                    st.markdown(f"**מדד RSI:** {res['RSI']}", help="מדד עוצמה (1-100). מתחת ל-30 זה מכירת יתר/מציאה, מעל 70 קניית יתר, ובאזור 50-60 מומנטום חיובי.")
+                    st.markdown(f"**מחיר יעד (Take Profit):** {res['מחיר יעד']}", help="מחיר יציאה מומלץ למכירה ולקיחת רווחים.")
+                    st.markdown(f"**קץ סיכון (Stop Loss):** {res['סטופ לוס']}", help="מחיר הגנה/חיתוך הפסד למניעת הפסדים נוספים.")
+                    st.markdown(f"**פוטנציאל רווח:** {res['פוטנציאל רווח (%)']}%", help="אחוז הרווח המשוער מהמחיר הנוכחי ועד למחיר היעד.")
+                    st.markdown(f"**יחס סיכוי/סיכון:** {res['יחס סיכוי/סיכון']}", help="יחס הרווח מול הסיכון. 2.0 ומעלה נחשב יחס מצוין (מרוויחים פי 2 ממה שמסכנים).")
                 with c2:
                     st.caption("גרף אינטראקטיבי (העבר אצבע לזיהוי מחיר ותאריך)")
                     fig = plot_interactive_chart(res['df'], res['מניה'], res['prefix'])
@@ -257,7 +232,6 @@ if check_password():
 
     st.markdown("---")
 
-    # 🇮🇱🇺🇸 סריקה כללית (Top 5)
     ISRAEL_TICKERS = ["TEVA.TA", "LUMI.TA", "POLI.TA", "DLEKG.TA", "BEZQ.TA", "ORL.TA", "NICE.TA", "ICL.TA", "HARL.TA", "MZTF.TA"]
     USA_TICKERS = ["AAPL", "NVDA", "TSLA", "AMZN", "GOOGL", "MSFT", "AMD", "META", "NFLX", "INTC"]
     ALL_TICKERS = ISRAEL_TICKERS + USA_TICKERS
@@ -289,7 +263,6 @@ if check_password():
                 histories_df[ticker] = res["df"]
                 prefixes[ticker] = res["prefix"]
 
-        # 🇮🇱 Top 5 ישראל
         st.subheader("🇮🇱 Top 5 הזדמנויות - הבורסה בתל אביב")
         df_il = pd.DataFrame()
         if results_israel:
@@ -298,7 +271,6 @@ if check_password():
 
         st.markdown("---")
 
-        # 🇺🇸 Top 5 ארה"ב
         st.subheader("🇺🇸 Top 5 הזדמנויות - בורסת ארה\"ב")
         df_us = pd.DataFrame()
         if results_usa:
@@ -307,7 +279,6 @@ if check_password():
 
         st.markdown("---")
 
-        # 📊 פירוט וגרפים ל-Top 10
         st.subheader("📊 פירוט וגרפים - 10 המניות הנבחרות")
         all_top = pd.concat([df_il, df_us], ignore_index=True)
 
@@ -317,23 +288,11 @@ if check_password():
                 with st.expander(f"📌 {ticker_name} - פוטנציאל רווח: {row['פוטנציאל רווח (%)']}%"):
                     col1, col2 = st.columns([1, 2])
                     with col1:
-                        st.write(f"**מחיר עדכני:** {row['מחיר עדכני']}")
-                        st.write(
-                            f"**מדד RSI:** {row['RSI']}", 
-                            help="מדד עוצמה יחסית (1-100). מראה את מומנטום הקונים מול המוכרים."
-                        )
-                        st.write(
-                            f"**יעד רווח:** {row['מחיר יעד']}", 
-                            help="מחיר יציאה מומלץ למימוש רווחים בעסקה."
-                        )
-                        st.write(
-                            f"**קץ סיכון (Stop Loss):** {row['סטופ לוס']}", 
-                            help="מחיר הגנה קריטי לחיתוך הפסד בזמן."
-                        )
-                        st.write(
-                            f"**יחס סיכוי/סיכון:** {row['יחס סיכוי/סיכון']}", 
-                            help="יחס הרווח מול הסיכון. 2.0 ומעלה נחשב יחס מצוין לעסקה."
-                        )
+                        st.markdown(f"**מחיר עדכני:** {row['מחיר עדכני']}")
+                        st.markdown(f"**מדד RSI:** {row['RSI']}", help="מדד עוצמה יחסית (1-100). מראה את מומנטום הקונים מול המוכרים.")
+                        st.markdown(f"**יעד רווח:** {row['מחיר יעד']}", help="מחיר יציאה מומלץ למימוש רווחים בעסקה.")
+                        st.markdown(f"**קץ סיכון (Stop Loss):** {row['סטופ לוס']}", help="מחיר הגנה קריטי לחיתוך הפסד בזמן.")
+                        st.markdown(f"**יחס סיכוי/סיכון:** {row['יחס סיכוי/סיכון']}", help="יחס הרווח מול הסיכון. 2.0 ומעלה נחשב יחס מצוין לעסקה.")
                     with col2:
                         fig = plot_interactive_chart(histories_df[ticker_name], ticker_name, prefixes[ticker_name])
                         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
