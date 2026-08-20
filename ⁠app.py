@@ -22,16 +22,19 @@ def check_password():
     return True
 
 if check_password():
-    st.title("📈 Stock Scanner Pro - Top 5 Opportunities")
-    st.markdown("סורק ומדרג את **5 ההזדמנויות המובילות** מתוך הבורסה הישראלית והאמריקאית.")
+    st.title("📈 Stock Scanner Pro")
+    st.markdown("סורק ומדרג בזמן אמת את **5 ההזדמנויות המובילות בישראל** ו-**5 המובילות בארה\"ב**.")
 
     DEFAULT_TICKERS = [
-        "AAPL", "NVDA", "TSLA", "AMZN", "GOOGL", "MSFT", "AMD", "META",
-        "TEVA.TA", "LUMI.TA", "POLI.TA", "DLEKG.TA", "BEZQ.TA", "ORL.TA", "NICE.TA"
+        # מניות ארה"ב
+        "AAPL", "NVDA", "TSLA", "AMZN", "GOOGL", "MSFT", "AMD", "META", "NFLX", "INTC",
+        # מניות ישראל
+        "TEVA.TA", "LUMI.TA", "POLI.TA", "DLEKG.TA", "BEZQ.TA", "ORL.TA", "NICE.TA", "ICL.TA", "HARL.TA", "MZTF.TA"
     ]
 
-    with st.spinner("מביא נתוני אמת..."):
-        results = []
+    with st.spinner("סורק ומנתח את הנתונים בלייב..."):
+        results_israel = []
+        results_usa = []
         histories = {}
 
         for ticker in DEFAULT_TICKERS:
@@ -44,7 +47,7 @@ if check_password():
                     raw_last_price = float(df['Close'].iloc[-1])
 
                     if is_israeli:
-                        # אם המחיר שמתקבל הוא באגורות (מעל 100) המר לשקלים
+                        # המרה קבועה מול נתוני אגורות/שקלים
                         if raw_last_price > 100:
                             price_ils = raw_last_price / 100.0
                             price_agorot = raw_last_price
@@ -67,7 +70,7 @@ if check_password():
                     rs = gain / loss
                     rsi = float((100 - (100 / (1 + rs))).iloc[-1])
 
-                    # חישוב ATR
+                    # חישוב ATR ותנודתיות
                     high_low = (df['High'] - df['Low']) / (100.0 if is_israeli and raw_last_price > 100 else 1.0)
                     atr = float(high_low.rolling(14).mean().iloc[-1])
 
@@ -80,7 +83,7 @@ if check_password():
 
                     prefix = "₪" if is_israeli else "$"
 
-                    results.append({
+                    item = {
                         "מניה": ticker,
                         "מחיר עדכני": display_price,
                         "RSI": round(rsi, 1),
@@ -89,21 +92,45 @@ if check_password():
                         "פוטנציאל רווח (%)": potential_gain_pct,
                         "סיכון (%)": risk_pct,
                         "יחס סיכוי/סיכון": ratio
-                    })
+                    }
+
+                    if is_israeli:
+                        results_israel.append(item)
+                    else:
+                        results_usa.append(item)
+
                     histories[ticker] = history_series
             except Exception:
                 continue
 
-        if results:
-            res_df = pd.DataFrame(results)
-            res_df = res_df.sort_values(by="פוטנציאל רווח (%)", ascending=False).head(5)
+        # 🇮🇱 top 5 ישראל
+        st.subheader("🇮🇱 Top 5 הזדמנויות - הבורסה בתל אביב")
+        df_il = pd.DataFrame()
+        if results_israel:
+            df_il = pd.DataFrame(results_israel).sort_values(by="פוטנציאל רווח (%)", ascending=False).head(5)
+            st.dataframe(df_il, use_container_width=True)
+        else:
+            st.info("לא נמצאו נתונים עבור מניות ישראליות.")
 
-            st.success("🎯 5 ההזדמנויות המובילות שנמצאו:")
-            st.dataframe(res_df, use_container_width=True)
+        st.markdown("---")
 
-            st.markdown("---")
-            st.subheader("📊 פירוט וגרפים לכל מניה")
-            for index, row in res_df.iterrows():
+        # 🇺🇸 top 5 ארה"ב
+        st.subheader("🇺🇸 Top 5 הזדמנויות - בורסת ארה\"ב")
+        df_us = pd.DataFrame()
+        if results_usa:
+            df_us = pd.DataFrame(results_usa).sort_values(by="פוטנציאל רווח (%)", ascending=False).head(5)
+            st.dataframe(df_us, use_container_width=True)
+        else:
+            st.info("לא נמצאו נתונים עבור מניות אמריקאיות.")
+
+        st.markdown("---")
+
+        # פירוט וגרפים לכל 10 המניות הנבחרות
+        st.subheader("📊 פירוט וגרפים - 10 המניות הנבחרות")
+        all_top = pd.concat([df_il, df_us], ignore_index=True)
+
+        if not all_top.empty:
+            for index, row in all_top.iterrows():
                 ticker_name = row['מניה']
                 with st.expander(f"📌 {ticker_name} - פוטנציאל רווח: {row['פוטנציאל רווח (%)']}%"):
                     col1, col2 = st.columns([1, 2])
@@ -114,7 +141,5 @@ if check_password():
                         st.write(f"**קץ סיכון (Stop Loss):** {row['סטופ לוס']}")
                         st.write(f"**יחס סיכוי/סיכון:** {row['יחס סיכוי/סיכון']}")
                     with col2:
-                        st.caption("גרף מחירים")
+                        st.caption("גרף מחירים - 3 חודשים אחרונים")
                         st.line_chart(histories[ticker_name])
-        else:
-            st.error("לא ניתן היה להוציא נתונים כעת, נסה לרענן את העמוד.")
