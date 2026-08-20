@@ -107,7 +107,7 @@ def detect_candlestick_pattern(df):
         return (
             "🟢 בליעה שורית (איתות עליות חזק)",
             "bullish",
-            "הגוף של הנר הירוק הנוכחי 'בולע' تماماً את הנר האדום שלפניו. המשמעות: הקונים נכנסו בעוצמה רבה ושלטו לחלוטין במסחר."
+            "הגוף של הנר הירוק הנוכחי 'בולע' לחלוטין את הנר האדום שלפניו. המשמעות: הקונים נכנסו בעוצמה רבה ושלטו לחלוטין במסחר."
         )
 
     # 3. בליעה דובית (Bearish Engulfing)
@@ -131,6 +131,38 @@ def detect_candlestick_pattern(df):
             "neutral",
             "מחיר הסגירה נמוך ממחיר הפתיחה. המוכרים שלטו ביום המסחר והמניה סיימה בירידה ללא תבנית היפוך מיוחדת."
         )
+
+def evaluate_trade_recommendation(pattern_type, rsi, ratio):
+    """משקלל את כל הנתונים וקובע האם כדאי להיכנס לעסקה"""
+    score = 0
+
+    # ניקוד נרות
+    if pattern_type == "bullish":
+        score += 3
+    elif pattern_type == "bearish":
+        score -= 3
+
+    # ניקוד RSI
+    if rsi < 35:
+        score += 2  # מכירות יתר - הזדמנות קנייה
+    elif 35 <= rsi <= 65:
+        score += 1  # מומנטום בריא
+    elif rsi > 70:
+        score -= 2  # קניית יתר - סיכון לתיקון
+
+    # ניקוד יחס סיכוי/סיכון
+    if ratio >= 2.0:
+        score += 2
+    elif ratio < 1.2:
+        score -= 2
+
+    # קביעת ההמלצה
+    if score >= 4:
+        return "✅ שווה כניסה (איתות שורי חזק)", "המניה מציגה שילוב מצוין של תבנית נרות, מומנטום חיובי ויחס סיכוי/סיכון משתלם."
+    elif score >= 1:
+        return "🟡 להמתין / כניסה בזהירות", "יש סימנים חיוביים, אך מומלץ להמתין לאישור נוסף או להגדיר סטופ לוס הדוק."
+    else:
+        return "❌ לא מומלץ כרגע", "הנתונים מעידים על לחץ מוכרים, RSI גבוה או יחס סיכוי/סיכון לא אטרקטיבי."
 
 def analyze_ticker(user_input, period="6mo"):
     clean_input = user_input.split("-")[0].split("/")[0].strip().replace('"', '').replace("'", "")
@@ -185,12 +217,16 @@ def analyze_ticker(user_input, period="6mo"):
     risk_pct = round(((calc_price - stop_loss) / calc_price) * 100, 2)
     ratio = round(potential_gain_pct / risk_pct, 2) if risk_pct > 0 else 0
 
+    rec_title, rec_desc = evaluate_trade_recommendation(pattern_type, rsi, ratio)
+
     analysis = {
         "מניה": ticker,
         "מחיר עדכני": display_price,
         "RSI": round(rsi, 1),
         "תבנית נר": candle_pattern,
         "הסבר נר": candle_desc,
+        "המלצה": rec_title,
+        "הסבר המלצה": rec_desc,
         "סטופ לוס": f"{prefix}{stop_loss}",
         "מחיר יעד": f"{prefix}{target}",
         "פוטנציאל רווח (%)": potential_gain_pct,
@@ -276,6 +312,11 @@ if check_password():
                 with c1:
                     st.metric("מחיר עדכני", res['מחיר עדכני'])
                     
+                    c_rec, c_rec_info = st.columns([4, 1])
+                    c_rec.markdown(f"**כדאיות כניסה:** {res['המלצה']}")
+                    with c_rec_info.popover("ℹ️"):
+                        st.write(res['הסבר המלצה'])
+
                     c_candle, c_candle_info = st.columns([4, 1])
                     c_candle.markdown(f"**תבנית נר:** {res['תבנית נר']}")
                     with c_candle_info.popover("ℹ️"):
@@ -324,9 +365,11 @@ if check_password():
                 is_israeli = ticker.endswith(".TA")
                 item = {
                     "מניה": res["מניה"],
+                    "כדאיות": res["המלצה"],
                     "מחיר עדכני": res["מחיר עדכני"],
                     "תבנית נר": res["תבנית נר"],
                     "הסבר נר": res["הסבר נר"],
+                    "הסבר המלצה": res["הסבר המלצה"],
                     "RSI": res["RSI"],
                     "סטופ לוס": res["סטופ לוס"],
                     "מחיר יעד": res["מחיר יעד"],
@@ -343,7 +386,7 @@ if check_password():
         st.subheader("🇮🇱 Top 5 הזדמנויות - הבורסה בתל אביב")
         df_il = pd.DataFrame()
         if results_israel:
-            display_cols = ["מניה", "מחיר עדכני", "תבנית נר", "RSI", "סטופ לוס", "מחיר יעד", "פוטנציאל רווח (%)", "יחס סיכוי/סיכון"]
+            display_cols = ["מניה", "כדאיות", "מחיר עדכני", "תבנית נר", "RSI", "מחיר יעד", "סטופ לוס", "פוטנציאל רווח (%)"]
             df_il = pd.DataFrame(results_israel).sort_values(by="פוטנציאל רווח (%)", ascending=False).head(5)
             st.dataframe(df_il[display_cols], use_container_width=True)
 
@@ -352,7 +395,7 @@ if check_password():
         st.subheader("🇺🇸 Top 5 הזדמנויות - בורסת ארה\"ב")
         df_us = pd.DataFrame()
         if results_usa:
-            display_cols = ["מניה", "מחיר עדכני", "תבנית נר", "RSI", "סטופ לוס", "מחיר יעד", "פוטנציאל רווח (%)", "יחס סיכוי/סיכון"]
+            display_cols = ["מניה", "כדאיות", "מחיר עדכני", "תבנית נר", "RSI", "מחיר יעד", "סטופ לוס", "פוטנציאל רווח (%)"]
             df_us = pd.DataFrame(results_usa).sort_values(by="פוטנציאל רווח (%)", ascending=False).head(5)
             st.dataframe(df_us[display_cols], use_container_width=True)
 
@@ -364,11 +407,16 @@ if check_password():
         if not all_top.empty:
             for index, row in all_top.iterrows():
                 ticker_name = row['מניה']
-                with st.expander(f"📌 {ticker_name} - {row['תבנית נר']} | פוטנציאל: {row['פוטנציאל רווח (%)']}%"):
+                with st.expander(f"📌 {ticker_name} - {row['כדאיות']} | פוטנציאל: {row['פוטנציאל רווח (%)']}%"):
                     col1, col2 = st.columns([1, 2])
                     with col1:
                         st.markdown(f"**מחיר עדכני:** {row['מחיר עדכני']}")
                         
+                        c_rec, c_rec_info = st.columns([4, 1])
+                        c_rec.markdown(f"**כדאיות כניסה:** {row['כדאיות']}")
+                        with c_rec_info.popover("ℹ️"):
+                            st.write(row['הסבר המלצה'])
+
                         c_candle, c_candle_info = st.columns([4, 1])
                         c_candle.markdown(f"**תבנית נר:** {row['תבנית נר']}")
                         with c_candle_info.popover("ℹ️"):
