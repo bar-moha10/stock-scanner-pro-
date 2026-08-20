@@ -5,10 +5,9 @@ import requests
 
 st.set_page_config(page_title="Stock Scanner Pro", page_icon="📈", layout="wide")
 
-# מילון תרגום משמות בעברית לסימולים של Yahoo Finance
+# מילון תרגום משמות בעברית לסימולים (ללא מירכאות פנימיות בתוך המילים)
 HEBREW_TICKERS = {
     "בזן": "ORL.TA",
-    "בז"ן": "ORL.TA",
     "בתי זיקוק": "ORL.TA",
     "דלק": "DLEKG.TA",
     "קבוצת דלק": "DLEKG.TA",
@@ -58,7 +57,7 @@ def get_live_price(ticker):
 
 def analyze_ticker(user_input):
     """פונקציה שמבצעת ניתוח טכני מלא למניה בודדת כולל המרה מעברית"""
-    clean_input = user_input.strip()
+    clean_input = user_input.strip().replace('"', '').replace("'", "")
     
     # בדיקה אם המשתמש הקליד שם בעברית מהמילון
     ticker = HEBREW_TICKERS.get(clean_input, clean_input).upper()
