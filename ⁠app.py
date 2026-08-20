@@ -25,6 +25,33 @@ HEBREW_TICKERS = {
     "אלביט": "ESLT.TA"
 }
 
+# רשימת המניות להשלמה אוטומטית בחיפוש
+SEARCH_OPTIONS = [
+    "",
+    "בזק",
+    "בזן / בתי זיקוק",
+    "דלק / קבוצת דלק",
+    "טבע",
+    "לאומי",
+    "פועלים",
+    "נייס",
+    "כיל / אייסיאל",
+    "הראל",
+    "מזרחי טפחות",
+    "ליברה",
+    "אלביט",
+    "AAPL - Apple",
+    "NVDA - Nvidia",
+    "TSLA - Tesla",
+    "AMZN - Amazon",
+    "GOOGL - Google",
+    "MSFT - Microsoft",
+    "AMD - AMD",
+    "META - Meta",
+    "NFLX - Netflix",
+    "INTC - Intel"
+]
+
 def check_password():
     if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
@@ -55,7 +82,7 @@ def get_live_price(ticker):
         return None
 
 def analyze_ticker(user_input, period="6mo"):
-    clean_input = user_input.strip().replace('"', '').replace("'", "")
+    clean_input = user_input.split("-")[0].split("/")[0].strip().replace('"', '').replace("'", "")
     ticker = HEBREW_TICKERS.get(clean_input, clean_input).upper()
     is_israeli = ticker.endswith(".TA")
 
@@ -69,7 +96,7 @@ def analyze_ticker(user_input, period="6mo"):
     if not raw_live_price or df.empty:
         return None, f"לא נמצאו נתונים עבור '{user_input}'."
 
-    # תיקון נרמול מניות ישראליות (שקלים מול אגורות)
+    # טיפול בנרמול מניות ישראליות (שקלים מול אגורות)
     if is_israeli:
         price_ils = raw_live_price / 100.0 if raw_live_price > 50 else raw_live_price
         price_agorot = price_ils * 100.0
@@ -143,16 +170,16 @@ def plot_interactive_chart(df, ticker, prefix):
             showgrid=True, 
             zeroline=False, 
             fixedrange=True,
-            showspikes=True,       # 📍 קו סמן אנכי
+            showspikes=True,       # 📍 קו סמן אנכי באצבע
             spikethickness=1.5,
-            spikecolor="#e63946", # צבע אדום לכוונת
+            spikecolor="#e63946", # צבע אדום
             spikemode="across"
         ),
         yaxis=dict(
             showgrid=True, 
             zeroline=False, 
             fixedrange=True,
-            showspikes=True,       # 📍 קו סמן אופקי
+            showspikes=True,       # 📍 קו סמן אופקי באצבע
             spikethickness=1.5,
             spikecolor="#e63946",
             spikemode="across"
@@ -163,6 +190,7 @@ def plot_interactive_chart(df, ticker, prefix):
 if check_password():
     st.title("📈 Stock Scanner Pro")
     
+    # ⚙️ סרגל צד לטווח זמן
     st.sidebar.header("⚙️ הגדרות תצוגה")
     selected_period = st.sidebar.select_slider(
         "טווח זמן לגרפים:",
@@ -171,11 +199,16 @@ if check_password():
         format_func=lambda x: {"1mo": "חודש", "3mo": "3 חודשים", "6mo": "חצי שנה", "1y": "שנה"}[x]
     )
 
+    # 🔍 אזור חיפוש עם השלמה אוטומטית
     st.subheader("🔍 חיפוש וניתוח מניה ספציפית")
     col_search1, col_search2 = st.columns([3, 1])
     
     with col_search1:
-        searched_ticker = st.text_input("הכנס שם מניה (למשל: בזן, דלק, MSFT, או DLEKG.TA):", value="")
+        searched_ticker = st.selectbox(
+            "הקלד שם מניה או סימול (למשל: ב...):",
+            options=SEARCH_OPTIONS,
+            index=0
+        )
     
     with col_search2:
         st.write("")
@@ -204,6 +237,7 @@ if check_password():
 
     st.markdown("---")
 
+    # 🇮🇱🇺🇸 סריקה כללית (Top 5)
     ISRAEL_TICKERS = ["TEVA.TA", "LUMI.TA", "POLI.TA", "DLEKG.TA", "BEZQ.TA", "ORL.TA", "NICE.TA", "ICL.TA", "HARL.TA", "MZTF.TA"]
     USA_TICKERS = ["AAPL", "NVDA", "TSLA", "AMZN", "GOOGL", "MSFT", "AMD", "META", "NFLX", "INTC"]
     ALL_TICKERS = ISRAEL_TICKERS + USA_TICKERS
@@ -235,6 +269,7 @@ if check_password():
                 histories_df[ticker] = res["df"]
                 prefixes[ticker] = res["prefix"]
 
+        # 🇮🇱 Top 5 ישראל
         st.subheader("🇮🇱 Top 5 הזדמנויות - הבורסה בתל אביב")
         df_il = pd.DataFrame()
         if results_israel:
@@ -243,6 +278,7 @@ if check_password():
 
         st.markdown("---")
 
+        # 🇺🇸 Top 5 ארה"ב
         st.subheader("🇺🇸 Top 5 הזדמנויות - בורסת ארה\"ב")
         df_us = pd.DataFrame()
         if results_usa:
@@ -251,6 +287,7 @@ if check_password():
 
         st.markdown("---")
 
+        # 📊 פירוט וגרפים ל-Top 10
         st.subheader("📊 פירוט וגרפים - 10 המניות הנבחרות")
         all_top = pd.concat([df_il, df_us], ignore_index=True)
 
