@@ -1,6 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import requests
 
 st.set_page_config(page_title="Stock Scanner Pro", page_icon="📈", layout="wide")
 
@@ -21,6 +22,19 @@ def check_password():
         return False
     return True
 
+def get_live_price(ticker):
+    """שליפת מחיר אמת ישירות מ-Yahoo Query API למעקף באגים של התאמות"""
+    try:
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        r = requests.get(url, headers=headers, timeout=5)
+        data = r.json()
+        meta = data['chart']['result'][0]['meta']
+        price = meta.get('regularMarketPrice') or meta.get('chartPreviousClose')
+        return float(price)
+    except Exception:
+        return None
+
 if check_password():
     st.title("📈 Stock Scanner Pro")
     st.markdown("סורק ומדרג בזמן אמת את **5 ההזדמנויות המובילות בישראל** ו-**5 המובילות בארה\"ב**.")
@@ -35,78 +49,87 @@ if check_password():
         results_usa = []
         histories = {}
 
-        try:
-            # הורדה מרוכזת עם group_by='ticker' ו-auto_adjust=False למניעת שיבוש מחירים
-            data = yf.download(ALL_TICKERS, period="3mo", auto_adjust=False, group_by='ticker', progress=False)
+        for ticker in ALL_TICKERS:
+            try:
+                is_israeli = ticker.endswith(".TA")
+                
+                # 1. שליפת מחיר אמת נוכחי בלייב עוקף התאמות
+                live_price = get_live_price(ticker)
+                
+                # 2. שליפת היסטוריה לצורך חישובי RSI ו-ATR
+                t = yf.Ticker(ticker)
+                df = t.history(period="3mo", auto_adjust=False)
 
-            for ticker in ALL_TICKERS:
-                try:
-                    df = data[ticker].dropna(subset=['Close'])
+                if live_price is None and not df.empty:
+                    live_price = float(df['Close'].iloc[-1])
 
-                    if not df.empty and len(df) > 10:
-                        last_price = float(df['Close'].iloc[-1])
-                        is_israeli = ticker.endswith(".TA")
-
-                        if is_israeli:
-                            # בורסת ת"א מציגה אגורות ב-Yahoo (למשל 8615)
-                            price_agorot = last_price
-                            price_ils = last_price / 100.0
-
-                            display_price = f"₪{price_ils:.2f} ({int(price_agorot):,} אג')"
-                            calc_price = price_ils
-                            prefix = "₪"
-
-                            history_series = df['Close'] / 100.0
-                            high_series = df['High'] / 100.0
-                            low_series = df['Low'] / 100.0
+                if live_price and not df.empty:
+                    if is_israeli:
+                        # בורסת ת"א מדווחת באגורות ב-Yahoo (למשל 8615)
+                        if live_price > 1000:
+                            price_agorot = live_price
+                            price_ils = live_price / 100.0
+                        elif live_price > 100:
+                            price_ils = live_price
+                            price_agorot = live_price * 100.0
                         else:
-                            display_price = f"${last_price:.2f}"
-                            calc_price = last_price
-                            prefix = "$"
+                            price_ils = live_price / 100.0
+                            price_agorot = live_price
 
-                            history_series = df['Close']
-                            high_series = df['High']
-                            low_series = df['Low']
+                        display_price = f"₪{price_ils:.2f} ({int(price_agorot):,} אג')"
+                        calc_price = price_ils
+                        prefix = "₪"
 
-                        # חישוב RSI
-                        delta = history_series.diff()
-                        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                        rs = gain / loss
-                        rsi = float((100 - (100 / (1 + rs))).iloc[-1]) if not loss.empty and loss.iloc[-1] != 0 else 50.0
+                        scale = 100.0 if df['Close'].iloc[-1] > 100 else 1.0
+                        history_series = df['Close'] / scale
+                        high_series = df['High'] / scale
+                        low_series = df['Low'] / scale
+                    else:
+                        display_price = f"${live_price:.2f}"
+                        calc_price = live_price
+                        prefix = "$"
 
-                        # חישוב ATR
-                        high_low = high_series - low_series
-                        atr = float(high_low.rolling(14).mean().iloc[-1]) if len(high_low) >= 14 else calc_price * 0.02
+                        history_series = df['Close']
+                        high_series = df['High']
+                        low_series = df['Low']
 
-                        stop_loss = round(calc_price - (1.5 * atr), 2)
-                        target = round(calc_price + (3.0 * atr), 2)
+                    # חישוב RSI
+                    delta = history_series.diff()
+                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                    rs = gain / loss
+                    rsi = float((100 - (100 / (1 + rs))).iloc[-1]) if not loss.empty and loss.iloc[-1] != 0 else 50.0
 
-                        potential_gain_pct = round(((target - calc_price) / calc_price) * 100, 2)
-                        risk_pct = round(((calc_price - stop_loss) / calc_price) * 100, 2)
-                        ratio = round(potential_gain_pct / risk_pct, 2) if risk_pct > 0 else 0
+                    # חישוב ATR
+                    high_low = high_series - low_series
+                    atr = float(high_low.rolling(14).mean().iloc[-1]) if len(high_low) >= 14 else calc_price * 0.02
 
-                        item = {
-                            "מניה": ticker,
-                            "מחיר עדכני": display_price,
-                            "RSI": round(rsi, 1),
-                            "סטופ לוס": f"{prefix}{stop_loss}",
-                            "מחיר יעד": f"{prefix}{target}",
-                            "פוטנציאל רווח (%)": potential_gain_pct,
-                            "סיכון (%)": risk_pct,
-                            "יחס סיכוי/סיכון": ratio
-                        }
+                    stop_loss = round(calc_price - (1.5 * atr), 2)
+                    target = round(calc_price + (3.0 * atr), 2)
 
-                        if is_israeli:
-                            results_israel.append(item)
-                        else:
-                            results_usa.append(item)
+                    potential_gain_pct = round(((target - calc_price) / calc_price) * 100, 2)
+                    risk_pct = round(((calc_price - stop_loss) / calc_price) * 100, 2)
+                    ratio = round(potential_gain_pct / risk_pct, 2) if risk_pct > 0 else 0
 
-                        histories[ticker] = history_series
-                except Exception:
-                    continue
-        except Exception:
-            st.error("שגיאה במשיכת הנתונים מ-Yahoo Finance.")
+                    item = {
+                        "מניה": ticker,
+                        "מחיר עדכני": display_price,
+                        "RSI": round(rsi, 1),
+                        "סטופ לוס": f"{prefix}{stop_loss}",
+                        "מחיר יעד": f"{prefix}{target}",
+                        "פוטנציאל רווח (%)": potential_gain_pct,
+                        "סיכון (%)": risk_pct,
+                        "יחס סיכוי/סיכון": ratio
+                    }
+
+                    if is_israeli:
+                        results_israel.append(item)
+                    else:
+                        results_usa.append(item)
+
+                    histories[ticker] = history_series
+            except Exception:
+                continue
 
         # 🇮🇱 Top 5 ישראל
         st.subheader("🇮🇱 Top 5 הזדמנויות - הבורסה בתל אביב")
