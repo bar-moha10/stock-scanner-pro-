@@ -35,75 +35,86 @@ if check_password():
         results_usa = []
         histories = {}
 
-        for ticker in ALL_TICKERS:
-            try:
-                t = yf.Ticker(ticker)
-                
-                # שליפת היסטוריה ללא התאמות דיבידנדים (מחיר נומינלי בלבד)
-                df = t.history(period="3mo", auto_adjust=False)
+        try:
+            # הורדה מרוכזת אחת לכל הטיקרים כדי למנוע חסימות וטבלאות ריקות
+            data = yf.download(ALL_TICKERS, period="3mo", auto_adjust=False, progress=False)
 
-                if not df.empty:
-                    last_price = float(df['Close'].iloc[-1])
-                    is_israeli = ticker.endswith(".TA")
-                    
-                    if is_israeli:
-                        # בורסת ת"א ב-Yahoo מציגה אגורות (למשל 8615)
-                        price_agorot = last_price
-                        price_ils = last_price / 100.0
-
-                        display_price = f"₪{price_ils:.2f} ({int(price_agorot):,} אג')"
-                        calc_price = price_ils
-                        prefix = "₪"
-                        
-                        history_series = df['Close'] / 100.0
-                        high_series = df['High'] / 100.0
-                        low_series = df['Low'] / 100.0
+            for ticker in ALL_TICKERS:
+                try:
+                    # שליפת סדרת Close ללא התאמות
+                    if len(ALL_TICKERS) > 1:
+                        close_series = data['Close'][ticker].dropna()
+                        high_series_raw = data['High'][ticker].dropna()
+                        low_series_raw = data['Low'][ticker].dropna()
                     else:
-                        display_price = f"${last_price:.2f}"
-                        calc_price = last_price
-                        prefix = "$"
-                        
-                        history_series = df['Close']
-                        high_series = df['High']
-                        low_series = df['Low']
+                        close_series = data['Close'].dropna()
+                        high_series_raw = data['High'].dropna()
+                        low_series_raw = data['Low'].dropna()
 
-                    # חישוב RSI
-                    delta = history_series.diff()
-                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                    rs = gain / loss
-                    rsi = float((100 - (100 / (1 + rs))).iloc[-1]) if not loss.empty and loss.iloc[-1] != 0 else 50.0
+                    if not close_series.empty and len(close_series) > 20:
+                        last_price = float(close_series.iloc[-1])
+                        is_israeli = ticker.endswith(".TA")
 
-                    # חישוב ATR
-                    high_low = high_series - low_series
-                    atr = float(high_low.rolling(14).mean().iloc[-1]) if len(high_low) >= 14 else calc_price * 0.02
+                        if is_israeli:
+                            # בורסת ת"א מציגה אגורות ב-Yahoo (למשל 8615)
+                            price_agorot = last_price
+                            price_ils = last_price / 100.0
 
-                    stop_loss = round(calc_price - (1.5 * atr), 2)
-                    target = round(calc_price + (3.0 * atr), 2)
+                            display_price = f"₪{price_ils:.2f} ({int(price_agorot):,} אג')"
+                            calc_price = price_ils
+                            prefix = "₪"
 
-                    potential_gain_pct = round(((target - calc_price) / calc_price) * 100, 2)
-                    risk_pct = round(((calc_price - stop_loss) / calc_price) * 100, 2)
-                    ratio = round(potential_gain_pct / risk_pct, 2) if risk_pct > 0 else 0
+                            history_series = close_series / 100.0
+                            high_series = high_series_raw / 100.0
+                            low_series = low_series_raw / 100.0
+                        else:
+                            display_price = f"${last_price:.2f}"
+                            calc_price = last_price
+                            prefix = "$"
 
-                    item = {
-                        "מניה": ticker,
-                        "מחיר עדכני": display_price,
-                        "RSI": round(rsi, 1),
-                        "סטופ לוס": f"{prefix}{stop_loss}",
-                        "מחיר יעד": f"{prefix}{target}",
-                        "פוטנציאל רווח (%)": potential_gain_pct,
-                        "סיכון (%)": risk_pct,
-                        "יחס סיכוי/סיכון": ratio
-                    }
+                            history_series = close_series
+                            high_series = high_series_raw
+                            low_series = low_series_raw
 
-                    if is_israeli:
-                        results_israel.append(item)
-                    else:
-                        results_usa.append(item)
+                        # חישוב RSI
+                        delta = history_series.diff()
+                        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                        rs = gain / loss
+                        rsi = float((100 - (100 / (1 + rs))).iloc[-1]) if not loss.empty and loss.iloc[-1] != 0 else 50.0
 
-                    histories[ticker] = history_series
-            except Exception:
-                continue
+                        # חישוב ATR
+                        high_low = high_series - low_series
+                        atr = float(high_low.rolling(14).mean().iloc[-1]) if len(high_low) >= 14 else calc_price * 0.02
+
+                        stop_loss = round(calc_price - (1.5 * atr), 2)
+                        target = round(calc_price + (3.0 * atr), 2)
+
+                        potential_gain_pct = round(((target - calc_price) / calc_price) * 100, 2)
+                        risk_pct = round(((calc_price - stop_loss) / calc_price) * 100, 2)
+                        ratio = round(potential_gain_pct / risk_pct, 2) if risk_pct > 0 else 0
+
+                        item = {
+                            "מניה": ticker,
+                            "מחיר עדכני": display_price,
+                            "RSI": round(rsi, 1),
+                            "סטופ לוס": f"{prefix}{stop_loss}",
+                            "מחיר יעד": f"{prefix}{target}",
+                            "פוטנציאל רווח (%)": potential_gain_pct,
+                            "סיכון (%)": risk_pct,
+                            "יחס סיכוי/סיכון": ratio
+                        }
+
+                        if is_israeli:
+                            results_israel.append(item)
+                        else:
+                            results_usa.append(item)
+
+                        histories[ticker] = history_series
+                except Exception:
+                    continue
+        except Exception:
+            st.error("שגיאה במשיכת הנתונים מ-Yahoo Finance.")
 
         # 🇮🇱 Top 5 ישראל
         st.subheader("🇮🇱 Top 5 הזדמנויות - הבורסה בתל אביב")
