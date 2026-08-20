@@ -6,6 +6,22 @@ import plotly.graph_objects as go
 
 st.set_page_config(page_title="Stock Scanner Pro", page_icon="📈", layout="wide")
 
+# עיצוב CSS להגדלת הכתב, הבלטתו והעלאת הניגודיות בטבלאות
+st.markdown("""
+    <style>
+    div[data-testid="stDataFrame"] td {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        color: #ffffff !important;
+    }
+    div[data-testid="stDataFrame"] th {
+        font-size: 17px !important;
+        font-weight: bold !important;
+        color: #00d2ff !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 HEBREW_TICKERS = {
     "בזן": "ORL.TA",
     "בתי זיקוק": "ORL.TA",
@@ -383,7 +399,6 @@ if check_password():
         st.subheader("🇮🇱 Top 5 הזדמנויות - הבורסה בתל אביב")
         df_il = pd.DataFrame()
         if results_israel:
-            # מיון כפול: קודם לפי דירוג הכדאיות (מהגבוה לנמוך) ואז לפי פוטנציאל הרווח
             df_il = pd.DataFrame(results_israel).sort_values(by=["דירוג המלצה", "פוטנציאל רווח (%)"], ascending=[False, False]).head(5).reset_index(drop=True)
             df_il["מקום"] = [f"#{i+1}" for i in range(len(df_il))]
             display_cols = ["מקום", "מניה", "כדאיות", "מחיר עדכני", "תבנית נר", "RSI", "מחיר יעד", "סטופ לוס", "פוטנציאל רווח (%)"]
@@ -394,7 +409,6 @@ if check_password():
         st.subheader("🇺🇸 Top 5 הזדמנויות - בורסת ארה\"ב")
         df_us = pd.DataFrame()
         if results_usa:
-            # מיון כפול: קודם לפי דירוג הכדאיות (מהגבוה לנמוך) ואז לפי פוטנציאל הרווח
             df_us = pd.DataFrame(results_usa).sort_values(by=["דירוג המלצה", "פוטנציאל רווח (%)"], ascending=[False, False]).head(5).reset_index(drop=True)
             df_us["מקום"] = [f"#{i+1}" for i in range(len(df_us))]
             display_cols = ["מקום", "מניה", "כדאיות", "מחיר עדכני", "תבנית נר", "RSI", "מחיר יעד", "סטופ לוס", "פוטנציאל רווח (%)"]
