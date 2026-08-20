@@ -2,10 +2,10 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import requests
+import plotly.graph_objects as go
 
 st.set_page_config(page_title="Stock Scanner Pro", page_icon="📈", layout="wide")
 
-# מילון תרגום משמות בעברית לסימולים (ללא מירכאות פנימיות בתוך המילים)
 HEBREW_TICKERS = {
     "בזן": "ORL.TA",
     "בתי זיקוק": "ORL.TA",
@@ -43,7 +43,6 @@ def check_password():
     return True
 
 def get_live_price(ticker):
-    """שליפת מחיר אמת ישירות מ-Yahoo Query API"""
     try:
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
         headers = {'User-Agent': 'Mozilla/5.0'}
@@ -55,24 +54,20 @@ def get_live_price(ticker):
     except Exception:
         return None
 
-def analyze_ticker(user_input):
-    """פונקציה שמבצעת ניתוח טכני מלא למניה בודדת כולל המרה מעברית"""
+def analyze_ticker(user_input, period="6mo"):
     clean_input = user_input.strip().replace('"', '').replace("'", "")
-    
-    # בדיקה אם המשתמש הקליד שם בעברית מהמילון
     ticker = HEBREW_TICKERS.get(clean_input, clean_input).upper()
-    
     is_israeli = ticker.endswith(".TA")
 
     raw_live_price = get_live_price(ticker)
     t = yf.Ticker(ticker)
-    df = t.history(period="3mo", auto_adjust=False)
+    df = t.history(period=period, auto_adjust=False)
 
     if raw_live_price is None and not df.empty:
         raw_live_price = float(df['Close'].iloc[-1])
 
     if not raw_live_price or df.empty:
-        return None, f"לא נמצאו נתונים עבור '{user_input}'. ודא שהטיקר נכון (למשל ORL.TA, AAPL או 'בזן')."
+        return None, f"לא נמצאו נתונים עבור '{user_input}'."
 
     if is_israeli:
         if raw_live_price > 1000:
@@ -92,27 +87,22 @@ def analyze_ticker(user_input):
         hist_last = df['Close'].iloc[-1]
         divider = 100.0 if hist_last > 100 else 1.0
 
-        history_series = df['Close'] / divider
-        high_series = df['High'] / divider
-        low_series = df['Low'] / divider
+        history_df = df[['Close', 'High', 'Low']] / divider
     else:
         display_price = f"${raw_live_price:.2f}"
         calc_price = raw_live_price
         prefix = "$"
-
-        history_series = df['Close']
-        high_series = df['High']
-        low_series = df['Low']
+        history_df = df[['Close', 'High', 'Low']]
 
     # חישוב RSI
-    delta = history_series.diff()
+    delta = history_df['Close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
     rs = gain / loss
     rsi = float((100 - (100 / (1 + rs))).iloc[-1]) if not loss.empty and loss.iloc[-1] != 0 else 50.0
 
     # חישוב ATR
-    high_low = high_series - low_series
+    high_low = history_df['High'] - history_df['Low']
     atr = float(high_low.rolling(14).mean().iloc[-1]) if len(high_low) >= 14 else calc_price * 0.02
 
     if pd.isna(atr) or atr <= 0 or atr > (calc_price * 0.2):
@@ -134,16 +124,45 @@ def analyze_ticker(user_input):
         "פוטנציאל רווח (%)": potential_gain_pct,
         "סיכון (%)": risk_pct,
         "יחס סיכוי/סיכון": ratio,
-        "history": history_series
+        "df": history_df,
+        "prefix": prefix
     }
 
     return analysis, None
 
+def plot_interactive_chart(df, ticker, prefix):
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=df.index, 
+        y=df['Close'], 
+        mode='lines', 
+        name='מחיר',
+        line=dict(color='#0066cc', width=2),
+        hovertemplate='%{x|%d/%m/%Y}<br>מחיר: ' + prefix + '%{y:.2f}<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        hovermode="x unified",
+        margin=dict(l=10, r=10, t=30, b=10),
+        height=320,
+        xaxis=dict(showgrid=True, zeroline=False),
+        yaxis=dict(showgrid=True, zeroline=False, title=f"מחיר ב-{prefix}")
+    )
+    return fig
+
 if check_password():
     st.title("📈 Stock Scanner Pro")
-    st.markdown("סורק ומדרג בזמן אמת מניות בארץ ובארה\"ב, ומאפשר ניתוח מותאם אישית.")
+    
+    # ⏱️ בחירת טווח זמן לגרפים
+    st.sidebar.header("⚙️ הגדרות תצוגה")
+    selected_period = st.sidebar.select_slider(
+        "טווח זמן לגרפים:",
+        options=["1mo", "3mo", "6mo", "1y"],
+        value="6mo",
+        format_func=lambda x: {"1mo": "חודש", "3mo": "3 חודשים", "6mo": "חצי שנה", "1y": "שנה"}[x]
+    )
 
-    # 🔍 אזור חיפוש מניה אישית
+    # 🔍 אזור חיפוש
     st.subheader("🔍 חיפוש וניתוח מניה ספציפית")
     col_search1, col_search2 = st.columns([3, 1])
     
@@ -157,7 +176,7 @@ if check_password():
 
     if searched_ticker and search_btn:
         with st.spinner(f"מנתח את {searched_ticker}..."):
-            res, err = analyze_ticker(searched_ticker)
+            res, err = analyze_ticker(searched_ticker, period=selected_period)
             if err:
                 st.error(err)
             else:
@@ -171,8 +190,9 @@ if check_password():
                     st.write(f"**פוטנציאל רווח:** {res['פוטנציאל רווח (%)']}%")
                     st.write(f"**יחס סיכוי/סיכון:** {res['יחס סיכוי/סיכון']}")
                 with c2:
-                    st.caption("גרף מחירים מנורמל")
-                    st.line_chart(res['history'])
+                    st.caption("גרף אינטראקטיבי (העבר עכבר לזיהוי מחירים ותאריכים)")
+                    fig = plot_interactive_chart(res['df'], res['מניה'], res['prefix'])
+                    st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("---")
 
@@ -184,10 +204,11 @@ if check_password():
     with st.spinner("מביא מחירי אמת ומעדכן את ה-Top 5..."):
         results_israel = []
         results_usa = []
-        histories = {}
+        histories_df = {}
+        prefixes = {}
 
         for ticker in ALL_TICKERS:
-            res, err = analyze_ticker(ticker)
+            res, err = analyze_ticker(ticker, period=selected_period)
             if res:
                 is_israeli = ticker.endswith(".TA")
                 item = {
@@ -204,7 +225,8 @@ if check_password():
                     results_israel.append(item)
                 else:
                     results_usa.append(item)
-                histories[ticker] = res["history"]
+                histories_df[ticker] = res["df"]
+                prefixes[ticker] = res["prefix"]
 
         # 🇮🇱 Top 5 ישראל
         st.subheader("🇮🇱 Top 5 הזדמנויות - הבורסה בתל אביב")
@@ -240,5 +262,5 @@ if check_password():
                         st.write(f"**קץ סיכון (Stop Loss):** {row['סטופ לוס']}")
                         st.write(f"**יחס סיכוי/סיכון:** {row['יחס סיכוי/סיכון']}")
                     with col2:
-                        st.caption("גרף מחירים בשקלים / דולרים")
-                        st.line_chart(histories[ticker_name])
+                        fig = plot_interactive_chart(histories_df[ticker_name], ticker_name, prefixes[ticker_name])
+                        st.plotly_chart(fig, use_container_width=True)
