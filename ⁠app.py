@@ -25,85 +25,94 @@ if check_password():
     st.title("📈 Stock Scanner Pro")
     st.markdown("סורק ומדרג בזמן אמת את **5 ההזדמנויות המובילות בישראל** ו-**5 המובילות בארה\"ב**.")
 
-    DEFAULT_TICKERS = [
-        # מניות ארה"ב
-        "AAPL", "NVDA", "TSLA", "AMZN", "GOOGL", "MSFT", "AMD", "META", "NFLX", "INTC",
-        # מניות ישראל
-        "TEVA.TA", "LUMI.TA", "POLI.TA", "DLEKG.TA", "BEZQ.TA", "ORL.TA", "NICE.TA", "ICL.TA", "HARL.TA", "MZTF.TA"
-    ]
+    ISRAEL_TICKERS = ["TEVA.TA", "LUMI.TA", "POLI.TA", "DLEKG.TA", "BEZQ.TA", "ORL.TA", "NICE.TA", "ICL.TA", "HARL.TA", "MZTF.TA"]
+    USA_TICKERS = ["AAPL", "NVDA", "TSLA", "AMZN", "GOOGL", "MSFT", "AMD", "META", "NFLX", "INTC"]
 
-    with st.spinner("סורק ומנתח את הנתונים בלייב..."):
+    ALL_TICKERS = ISRAEL_TICKERS + USA_TICKERS
+
+    with st.spinner("מוריד נתונים ומנתח מניות בישראל וארה\"ב..."):
         results_israel = []
         results_usa = []
         histories = {}
 
-        for ticker in DEFAULT_TICKERS:
-            try:
-                t = yf.Ticker(ticker)
-                df = t.history(period="3mo")
+        try:
+            # הורדה מרוכזת ויציבה עבור כל ה-Tickers
+            data = yf.download(ALL_TICKERS, period="3mo", group_by="ticker", progress=False)
 
-                if not df.empty and len(df) > 20:
-                    is_israeli = ticker.endswith(".TA")
-                    raw_last_price = float(df['Close'].iloc[-1])
+            for ticker in ALL_TICKERS:
+                try:
+                    df = data[ticker].dropna()
+                    if len(df) > 20:
+                        is_israeli = ticker.endswith(".TA")
+                        raw_last_price = float(df['Close'].iloc[-1])
 
-                    if is_israeli:
-                        # המרה קבועה מול נתוני אגורות/שקלים
-                        if raw_last_price > 100:
-                            price_ils = raw_last_price / 100.0
-                            price_agorot = raw_last_price
+                        if is_israeli:
+                            # אם המחיר באגורות (מעל 100), המר לשקלים
+                            if raw_last_price > 100:
+                                price_ils = raw_last_price / 100.0
+                                price_agorot = raw_last_price
+                                history_series = df['Close'] / 100.0
+                                high_series = df['High'] / 100.0
+                                low_series = df['Low'] / 100.0
+                            else:
+                                price_ils = raw_last_price
+                                price_agorot = raw_last_price * 100.0
+                                history_series = df['Close']
+                                high_series = df['High']
+                                low_series = df['Low']
+
+                            display_price = f"₪{round(price_ils, 2)} ({int(price_agorot)} אג')"
+                            calc_price = price_ils
+                            prefix = "₪"
                         else:
-                            price_ils = raw_last_price
-                            price_agorot = raw_last_price * 100.0
+                            display_price = f"${round(raw_last_price, 2)}"
+                            history_series = df['Close']
+                            high_series = df['High']
+                            low_series = df['Low']
+                            calc_price = raw_last_price
+                            prefix = "$"
 
-                        display_price = f"₪{round(price_ils, 2)} ({int(price_agorot)} אג')"
-                        history_series = df['Close'] / 100.0 if raw_last_price > 100 else df['Close']
-                        calc_price = price_ils
-                    else:
-                        display_price = f"${round(raw_last_price, 2)}"
-                        history_series = df['Close']
-                        calc_price = raw_last_price
+                        # חישוב RSI
+                        delta = history_series.diff()
+                        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                        rs = gain / loss
+                        rsi = float((100 - (100 / (1 + rs))).iloc[-1])
 
-                    # חישוב RSI
-                    delta = history_series.diff()
-                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                    rs = gain / loss
-                    rsi = float((100 - (100 / (1 + rs))).iloc[-1])
+                        # חישוב ATR
+                        high_low = high_series - low_series
+                        atr = float(high_low.rolling(14).mean().iloc[-1])
 
-                    # חישוב ATR ותנודתיות
-                    high_low = (df['High'] - df['Low']) / (100.0 if is_israeli and raw_last_price > 100 else 1.0)
-                    atr = float(high_low.rolling(14).mean().iloc[-1])
+                        stop_loss = round(calc_price - (1.5 * atr), 2)
+                        target = round(calc_price + (3.0 * atr), 2)
 
-                    stop_loss = round(calc_price - (1.5 * atr), 2)
-                    target = round(calc_price + (3.0 * atr), 2)
+                        potential_gain_pct = round(((target - calc_price) / calc_price) * 100, 2)
+                        risk_pct = round(((calc_price - stop_loss) / calc_price) * 100, 2)
+                        ratio = round(potential_gain_pct / risk_pct, 2) if risk_pct > 0 else 0
 
-                    potential_gain_pct = round(((target - calc_price) / calc_price) * 100, 2)
-                    risk_pct = round(((calc_price - stop_loss) / calc_price) * 100, 2)
-                    ratio = round(potential_gain_pct / risk_pct, 2) if risk_pct > 0 else 0
+                        item = {
+                            "מניה": ticker,
+                            "מחיר עדכני": display_price,
+                            "RSI": round(rsi, 1),
+                            "סטופ לוס": f"{prefix}{stop_loss}",
+                            "מחיר יעד": f"{prefix}{target}",
+                            "פוטנציאל רווח (%)": potential_gain_pct,
+                            "סיכון (%)": risk_pct,
+                            "יחס סיכוי/סיכון": ratio
+                        }
 
-                    prefix = "₪" if is_israeli else "$"
+                        if is_israeli:
+                            results_israel.append(item)
+                        else:
+                            results_usa.append(item)
 
-                    item = {
-                        "מניה": ticker,
-                        "מחיר עדכני": display_price,
-                        "RSI": round(rsi, 1),
-                        "סטופ לוס": f"{prefix}{stop_loss}",
-                        "מחיר יעד": f"{prefix}{target}",
-                        "פוטנציאל רווח (%)": potential_gain_pct,
-                        "סיכון (%)": risk_pct,
-                        "יחס סיכוי/סיכון": ratio
-                    }
+                        histories[ticker] = history_series
+                except Exception:
+                    continue
+        except Exception:
+            st.error("שגיאה בטעינת נתונים.")
 
-                    if is_israeli:
-                        results_israel.append(item)
-                    else:
-                        results_usa.append(item)
-
-                    histories[ticker] = history_series
-            except Exception:
-                continue
-
-        # 🇮🇱 top 5 ישראל
+        # 🇮🇱 Top 5 ישראל
         st.subheader("🇮🇱 Top 5 הזדמנויות - הבורסה בתל אביב")
         df_il = pd.DataFrame()
         if results_israel:
@@ -114,7 +123,7 @@ if check_password():
 
         st.markdown("---")
 
-        # 🇺🇸 top 5 ארה"ב
+        # 🇺🇸 Top 5 ארה"ב
         st.subheader("🇺🇸 Top 5 הזדמנויות - בורסת ארה\"ב")
         df_us = pd.DataFrame()
         if results_usa:
@@ -125,7 +134,7 @@ if check_password():
 
         st.markdown("---")
 
-        # פירוט וגרפים לכל 10 המניות הנבחרות
+        # פירוט וגרפים
         st.subheader("📊 פירוט וגרפים - 10 המניות הנבחרות")
         all_top = pd.concat([df_il, df_us], ignore_index=True)
 
@@ -141,5 +150,5 @@ if check_password():
                         st.write(f"**קץ סיכון (Stop Loss):** {row['סטופ לוס']}")
                         st.write(f"**יחס סיכוי/סיכון:** {row['יחס סיכוי/סיכון']}")
                     with col2:
-                        st.caption("גרף מחירים - 3 חודשים אחרונים")
+                        st.caption("גרף מחירים")
                         st.line_chart(histories[ticker_name])
