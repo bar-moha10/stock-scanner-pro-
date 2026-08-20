@@ -82,7 +82,7 @@ def get_live_price(ticker):
 
 def detect_candlestick_pattern(df):
     if len(df) < 2:
-        return "אין מספיק נתונים", "neutral"
+        return "אין מספיק נתונים", "neutral", "אין מספיק נתוני מסחר כדי לזהות תבנית."
 
     curr = df.iloc[-1]
     prev = df.iloc[-2]
@@ -96,21 +96,41 @@ def detect_candlestick_pattern(df):
 
     # 1. פטיש (Hammer)
     if lower_shadow > (2 * body) and upper_shadow < (body * 0.5) and body > 0:
-        return "🔨 נר פטיש (איתות עליות)", "bullish"
+        return (
+            "🔨 נר פטיש (איתות עליות)",
+            "bullish",
+            "נר פטיש מציג צל ישר וארוך למטה. המשמעות: המוכרים ניסו להוריד את המחיר חזק, אך הקונים השתלטו מחדש ודחפו אותו חזרה למעלה. איתות שורי חזק להיפוך עליות."
+        )
 
     # 2. בליעה שורית (Bullish Engulfing)
     if p_close < p_open and c_close > c_open and c_open <= p_close and c_close >= p_open:
-        return "🟢 בליעה שורית (איתות עליות חזק)", "bullish"
+        return (
+            "🟢 בליעה שורית (איתות עליות חזק)",
+            "bullish",
+            "הגוף של הנר הירוק הנוכחי 'בולע' تماماً את הנר האדום שלפניו. המשמעות: הקונים נכנסו בעוצמה רבה ושלטו לחלוטין במסחר."
+        )
 
     # 3. בליעה דובית (Bearish Engulfing)
     if p_close > p_open and c_close < c_open and c_open >= p_close and c_close <= p_open:
-        return "🔴 בליעה דובית (איתות ירידות)", "bearish"
+        return (
+            "🔴 בליעה דובית (איתות ירידות)",
+            "bearish",
+            "הגוף של הנר האדום הנוכחי בולע לחלוטין את הנר הירוק שלפניו. המשמעות: לחץ מכירות כבד והשתלטות של המוכרים בשוק."
+        )
 
-    # 4. נר ירוק / אדום
+    # 4. נר ירוק / אדום רגיל
     if c_close > c_open:
-        return "🕯️ נר ירוק רגיל", "neutral"
+        return (
+            "🕯️ נר ירוק רגיל",
+            "neutral",
+            "מחיר הסגירה גבוה ממחיר הפתיחה. הקונים היו חזקים יותר מהמוכרים ביום הזה, והמניה סיימה בעלייה ללא תבנית היפוך מיוחדת."
+        )
     else:
-        return "🕯️ נר אדום רגיל", "neutral"
+        return (
+            "🕯️ נר אדום רגיל",
+            "neutral",
+            "מחיר הסגירה נמוך ממחיר הפתיחה. המוכרים שלטו ביום המסחר והמניה סיימה בירידה ללא תבנית היפוך מיוחדת."
+        )
 
 def analyze_ticker(user_input, period="6mo"):
     clean_input = user_input.split("-")[0].split("/")[0].strip().replace('"', '').replace("'", "")
@@ -144,7 +164,7 @@ def analyze_ticker(user_input, period="6mo"):
         prefix = "$"
         history_df = df[['Open', 'High', 'Low', 'Close']].copy()
 
-    candle_pattern, pattern_type = detect_candlestick_pattern(history_df)
+    candle_pattern, pattern_type, candle_desc = detect_candlestick_pattern(history_df)
 
     delta = history_df['Close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
@@ -170,6 +190,7 @@ def analyze_ticker(user_input, period="6mo"):
         "מחיר עדכני": display_price,
         "RSI": round(rsi, 1),
         "תבנית נר": candle_pattern,
+        "הסבר נר": candle_desc,
         "סטופ לוס": f"{prefix}{stop_loss}",
         "מחיר יעד": f"{prefix}{target}",
         "פוטנציאל רווח (%)": potential_gain_pct,
@@ -258,7 +279,7 @@ if check_password():
                     c_candle, c_candle_info = st.columns([4, 1])
                     c_candle.markdown(f"**תבנית נר:** {res['תבנית נר']}")
                     with c_candle_info.popover("ℹ️"):
-                        st.write("זיהוי אוטומטי של תבניות נרות יפניים ביום המסחר האחרון.")
+                        st.write(res['הסבר נר'])
 
                     c_rsi, c_rsi_info = st.columns([4, 1])
                     c_rsi.markdown(f"**מדד RSI:** {res['RSI']}")
@@ -305,6 +326,7 @@ if check_password():
                     "מניה": res["מניה"],
                     "מחיר עדכני": res["מחיר עדכני"],
                     "תבנית נר": res["תבנית נר"],
+                    "הסבר נר": res["הסבר נר"],
                     "RSI": res["RSI"],
                     "סטופ לוס": res["סטופ לוס"],
                     "מחיר יעד": res["מחיר יעד"],
@@ -321,16 +343,18 @@ if check_password():
         st.subheader("🇮🇱 Top 5 הזדמנויות - הבורסה בתל אביב")
         df_il = pd.DataFrame()
         if results_israel:
+            display_cols = ["מניה", "מחיר עדכני", "תבנית נר", "RSI", "סטופ לוס", "מחיר יעד", "פוטנציאל רווח (%)", "יחס סיכוי/סיכון"]
             df_il = pd.DataFrame(results_israel).sort_values(by="פוטנציאל רווח (%)", ascending=False).head(5)
-            st.dataframe(df_il, use_container_width=True)
+            st.dataframe(df_il[display_cols], use_container_width=True)
 
         st.markdown("---")
 
         st.subheader("🇺🇸 Top 5 הזדמנויות - בורסת ארה\"ב")
         df_us = pd.DataFrame()
         if results_usa:
+            display_cols = ["מניה", "מחיר עדכני", "תבנית נר", "RSI", "סטופ לוס", "מחיר יעד", "פוטנציאל רווח (%)", "יחס סיכוי/סיכון"]
             df_us = pd.DataFrame(results_usa).sort_values(by="פוטנציאל רווח (%)", ascending=False).head(5)
-            st.dataframe(df_us, use_container_width=True)
+            st.dataframe(df_us[display_cols], use_container_width=True)
 
         st.markdown("---")
 
@@ -348,7 +372,7 @@ if check_password():
                         c_candle, c_candle_info = st.columns([4, 1])
                         c_candle.markdown(f"**תבנית נר:** {row['תבנית נר']}")
                         with c_candle_info.popover("ℹ️"):
-                            st.write("זיהוי אוטומטי של תבניות נרות יפניים ביום המסחר האחרון.")
+                            st.write(row['הסבר נר'])
 
                         c_rsi, c_rsi_info = st.columns([4, 1])
                         c_rsi.markdown(f"**מדד RSI:** {row['RSI']}")
