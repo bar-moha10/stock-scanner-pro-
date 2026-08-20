@@ -23,13 +23,18 @@ def check_password():
 
 if check_password():
     st.title("📈 Stock Scanner Pro - Top 5 Opportunities")
-    st.markdown("סורק ומדרג את **5 ההזדמנויות המובילות** מתוך רשימת המעקב לפי פוטנציאל תשואה/סיכון.")
+    st.markdown("סורק ומדרג את **5 ההזדמנויות המובילות** מתוך רשימת מעקב גלובלית וישראלית.")
 
-    DEFAULT_TICKERS = ["AAPL", "AMD", "NVDA", "MSFT", "TSLA", "AMZN", "GOOGL", "META", "NFLX", "INTC"]
+    # רשימה משולבת: ארה"ב + מניות מובילות מתל אביב (.TA)
+    DEFAULT_TICKERS = [
+        "AAPL", "NVDA", "TSLA", "AMZN", "GOOGL", "MSFT", "AMD",
+        "TEVA.TA", "LUMI.TA", "POLI.TA", "DLEKG.TA", "BEZQ.TA", "ORL.TA", "NICE.TA"
+    ]
 
     if st.button("🚀 הרץ סריקה מתקדמת"):
         with st.spinner("סורק ומדרג מניות..."):
             results = []
+            histories = {}
 
             for ticker in DEFAULT_TICKERS:
                 try:
@@ -59,14 +64,15 @@ if check_password():
 
                         results.append({
                             "מניה": ticker,
-                            "מחיר ($)": round(current_price, 2),
+                            "מחיר": round(current_price, 2),
                             "RSI": round(rsi, 1),
-                            "סטופ לוס ($)": stop_loss,
-                            "מחיר יעד ($)": target,
+                            "סטופ לוס": stop_loss,
+                            "מחיר יעד": target,
                             "פוטנציאל רווח (%)": potential_gain_pct,
                             "סיכון (%)": risk_pct,
                             "יחס סיכוי/סיכון": ratio
                         })
+                        histories[ticker] = close_prices
                 except Exception:
                     continue
 
@@ -78,12 +84,19 @@ if check_password():
                 st.dataframe(res_df, use_container_width=True)
 
                 st.markdown("---")
-                st.subheader("📊 פירוט מניות נבחרות")
+                st.subheader("📊 פירוט וגרפים לכל מניה")
                 for index, row in res_df.iterrows():
-                    with st.expander(f"📌 {row['מניה']} - פוטנציאל רווח: {row['פוטנציאל רווח (%)']}%"):
-                        st.write(f"**מחיר נוכחי:** ${row['מחיר ($)']}")
-                        st.write(f"**מדד RSI:** {row['RSI']}")
-                        st.write(f"**יעד רווח:** ${row['מחיר יעד ($)']}")
-                        st.write(f"**קץ סיכון (Stop Loss):** ${row['סטופ לוס ($)']}")
+                    ticker_name = row['מניה']
+                    with st.expander(f"📌 {ticker_name} - פוטנציאל רווח: {row['פוטנציאל רווח (%)']}%"):
+                        col1, col2 = st.columns([1, 2])
+                        with col1:
+                            st.write(f"**מחיר נוכחי:** {row['מחיר']}")
+                            st.write(f"**מדד RSI:** {row['RSI']}")
+                            st.write(f"**יעד רווח:** {row['מחיר יעד']}")
+                            st.write(f"**קץ סיכון (Stop Loss):** {row['סטופ לוס']}")
+                            st.write(f"**יחס סיכוי/סיכון:** {row['יחס סיכוי/סיכון']}")
+                        with col2:
+                            st.caption("גרף מחירים - 3 חודשים אחרונים")
+                            st.line_chart(histories[ticker_name])
             else:
                 st.error("לא ניתן היה להוציא נתונים כעת, נסה שוב בעוד דקה.")
