@@ -5,6 +5,27 @@ import requests
 
 st.set_page_config(page_title="Stock Scanner Pro", page_icon="📈", layout="wide")
 
+# מילון תרגום משמות בעברית לסימולים של Yahoo Finance
+HEBREW_TICKERS = {
+    "בזן": "ORL.TA",
+    "בז"ן": "ORL.TA",
+    "בתי זיקוק": "ORL.TA",
+    "דלק": "DLEKG.TA",
+    "קבוצת דלק": "DLEKG.TA",
+    "בזק": "BEZQ.TA",
+    "טבע": "TEVA.TA",
+    "לאומי": "LUMI.TA",
+    "פועלים": "POLI.TA",
+    "נייס": "NICE.TA",
+    "כיל": "ICL.TA",
+    "אייסיאל": "ICL.TA",
+    "הראל": "HARL.TA",
+    "מזרחי": "MZTF.TA",
+    "מזרחי טפחות": "MZTF.TA",
+    "ליברה": "LBRT.TA",
+    "אלביט": "ESLT.TA"
+}
+
 def check_password():
     if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
@@ -35,9 +56,13 @@ def get_live_price(ticker):
     except Exception:
         return None
 
-def analyze_ticker(ticker):
-    """פונקציה שמבצעת ניתוח טכני מלא למניה בודדת"""
-    ticker = ticker.strip().upper()
+def analyze_ticker(user_input):
+    """פונקציה שמבצעת ניתוח טכני מלא למניה בודדת כולל המרה מעברית"""
+    clean_input = user_input.strip()
+    
+    # בדיקה אם המשתמש הקליד שם בעברית מהמילון
+    ticker = HEBREW_TICKERS.get(clean_input, clean_input).upper()
+    
     is_israeli = ticker.endswith(".TA")
 
     raw_live_price = get_live_price(ticker)
@@ -48,7 +73,7 @@ def analyze_ticker(ticker):
         raw_live_price = float(df['Close'].iloc[-1])
 
     if not raw_live_price or df.empty:
-        return None, "לא נמצאו נתונים עבור סימול זה. ודא שהטיקר נכון (למשל AAPL או DLEKG.TA)."
+        return None, f"לא נמצאו נתונים עבור '{user_input}'. ודא שהטיקר נכון (למשל ORL.TA, AAPL או 'בזן')."
 
     if is_israeli:
         if raw_live_price > 1000:
@@ -124,15 +149,15 @@ if check_password():
     col_search1, col_search2 = st.columns([3, 1])
     
     with col_search1:
-        searched_ticker = st.text_input("הכנס סימול מניה (למשל: MSFT, AMZN, או DLEKG.TA למניה ישראלית):", value="")
+        searched_ticker = st.text_input("הכנס שם מניה (למשל: בזן, דלק, MSFT, או DLEKG.TA):", value="")
     
     with col_search2:
-        st.write("") # מרווח אנכי
+        st.write("")
         st.write("")
         search_btn = st.button("פתח ניתוח 📊")
 
     if searched_ticker and search_btn:
-        with st.spinner(f"מנתח את {searched_ticker.upper()}..."):
+        with st.spinner(f"מנתח את {searched_ticker}..."):
             res, err = analyze_ticker(searched_ticker)
             if err:
                 st.error(err)
