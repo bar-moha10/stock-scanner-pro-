@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 
 st.set_page_config(page_title="Stock Scanner Pro - Golden Trade Edition", page_icon="📈", layout="wide")
 
-# עיצוב CSS להגדלת הכתב, הבלטתו והעלאת הניגודיות בטבלאות ובכרטיסיות
+# עיצוב CSS
 st.markdown("""
     <style>
     div[data-testid="stDataFrame"] td {
@@ -18,15 +18,6 @@ st.markdown("""
         font-size: 17px !important;
         font-weight: bold !important;
         color: #00d2ff !important;
-    }
-    .golden-badge {
-        background-color: #ffd700;
-        color: #000000;
-        font-weight: bold;
-        padding: 4px 10px;
-        border-radius: 8px;
-        display: inline-block;
-        margin-bottom: 5px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -119,109 +110,105 @@ def detect_candlestick_pattern(df):
     lower_shadow = min(c_open, c_close) - c_low
     upper_shadow = c_high - max(c_open, c_close)
 
-    # 1. פטיש (Hammer)
     if lower_shadow > (2 * body) and upper_shadow < (body * 0.5) and body > 0:
         return (
             "🔨 נר פטיש (איתות עליות)",
             "bullish",
-            "נר פטיש מציג צל ישר וארוך למטה. המשמעות: המוכרים ניסו להוריד את המחיר חזק, אך הקונים השתלטו מחדש ודחפו אותו חזרה למעלה. איתות שורי חזק להיפוך עליות."
+            "נר פטיש מציג צל ישר וארוך למטה. הקונים השתלטו מחדש ודחפו את המחיר למעלה."
         )
 
-    # 2. בליעה שורית (Bullish Engulfing)
     if p_close < p_open and c_close > c_open and c_open <= p_close and c_close >= p_open:
         return (
             "🟢 בליעה שורית (איתות עליות חזק)",
             "bullish",
-            "הגוף של הנר הירוק הנוכחי 'בולע' לחלוטין את הנר האדום שלפניו. המשמעות: הקונים נכנסו בעוצמה רבה ושלטו לחלוטין במסחר."
+            "הגוף של הנר הירוק הנוכחי בולע לחלוטין את הנר האדום שלפניו. הקונים נכנסו בעוצמה."
         )
 
-    # 3. בליעה דובית (Bearish Engulfing)
     if p_close > p_open and c_close < c_open and c_open >= p_close and c_close <= p_open:
         return (
             "🔴 בליעה דובית (איתות ירידות)",
             "bearish",
-            "הגוף של הנר האדום הנוכחי בולע לחלוטין את הנר הירוק שלפניו. המשמעות: לחץ מכירות כבד והשתלטות של המוכרים בשוק."
+            "הגוף של הנר האדום הנוכחי בולע לחלוטין את הנר הירוק שלפניו. לחץ מכירות כבד."
         )
 
-    # 4. נר ירוק / אדום רגיל
     if c_close > c_open:
         return (
             "🕯️ נר ירוק רגיל",
             "neutral",
-            "מחיר הסגירה גבוה ממחיר הפתיחה. הקונים היו חזקים יותר מהמוכרים ביום הזה, והמניה סיימה בעלייה ללא תבנית היפוך מיוחדת."
+            "מחיר הסגירה גבוה ממחיר הפתיחה. הקונים היו חזקים יותר ביום זה."
         )
     else:
         return (
             "🕯️ נר אדום רגיל",
             "neutral",
-            "מחיר הסגירה נמוך ממחיר הפתיחה. המוכרים שלטו ביום המסחר והמניה סיימה בירידה ללא תבנית היפוך מיוחדת."
+            "מחיר הסגירה נמוך ממחיר הפתיחה. המוכרים שלטו ביום המסחר."
         )
 
-def evaluate_trade_recommendation(pattern_type, rsi, ratio, ma50, ma200, current_price, rvol):
-    score = 0
-    is_golden_trade = False
-    golden_reasons = []
+def calculate_score_and_recommendation(pattern_type, rsi, ratio, ma50, ma200, current_price, rvol):
+    score_points = 0
+    reasons = []
 
-    # 1. ניתוח מגמה לפי ממוצעים נעים (MA50 & MA200)
+    # 1. מגמה מול ממוצעים נעים (עד 3 נקודות)
     above_ma50 = current_price > ma50 if ma50 else False
     above_ma200 = current_price > ma200 if ma200 else False
 
     if above_ma50 and above_ma200:
-        score += 2
-        golden_reasons.append("מגמה ראשית עולה (מעל ממוצע 50 ו-200)")
+        score_points += 3
+        reasons.append("מגמה ראשי עולה (מעל MA50 ו-MA200)")
     elif above_ma50:
-        score += 1
+        score_points += 2
+        reasons.append("מעל ממוצע נע 50")
+    elif above_ma200:
+        score_points += 1
 
-    # 2. נפח מסחר יחסי (RVOL)
+    # 2. נפח מסחר יחסי RVOL (עד 2 נקודות)
     if rvol >= 1.5:
-        score += 2
-        golden_reasons.append(f"כניסת כסף כבד/מוסדיים (RVOL: {rvol:.1f}x)")
+        score_points += 2
+        reasons.append(f"כניסת כסף מוסדי כבד (RVOL {rvol:.1f}x)")
     elif rvol >= 1.2:
-        score += 1
+        score_points += 1
+        reasons.append(f"נפח מסחר מוגבר (RVOL {rvol:.1f}x)")
 
-    # 3. תבנית נרות
-    if pattern_type == "bullish":
-        score += 2
-        golden_reasons.append("תבנית נר שורית להיפוך עליות")
-    elif pattern_type == "bearish":
-        score -= 3
-
-    # 4. RSI
-    if rsi < 35:
-        score += 2
-        golden_reasons.append(f"מכירת יתר - RSI נמוך ({rsi:.1f})")
-    elif 35 <= rsi <= 60:
-        score += 1
-    elif rsi > 70:
-        score -= 2
-
-    # 5. יחס סיכוי / סיכון
+    # 3. יחס סיכוי / סיכון (עד 2 נקודות)
     if ratio >= 2.0:
-        score += 2
-        golden_reasons.append(f"יחס סיכוי/סיכון מצוין ({ratio}:1)")
-    elif ratio < 1.2:
-        score -= 2
+        score_points += 2
+        reasons.append(f"יחס סיכוי/סיכון מעולה ({ratio}:1)")
+    elif ratio >= 1.3:
+        score_points += 1
 
-    # בדיקת התנאים לעסקת זהב (Golden Trade)
-    if (above_ma50 or above_ma200) and rvol >= 1.3 and ratio >= 2.0 and (pattern_type == "bullish" or rsi < 55) and score >= 6:
-        is_golden_trade = True
-        rec_title = "🏆 עסקת זהב (Golden Trade)!"
-        rec_rank = 4
-        rec_desc = "המניה עומדת ב-5 מתוך 5 תנאי האיכות המחמירים ביותר: מגמה ראשית עולה, נפח מסחר מוסדי, יחס סיכוי/סיכון מעולה ומומנטום חיובי."
-    elif score >= 4:
-        rec_title = "✅ שווה כניסה (איתות שורי חזק)"
-        rec_rank = 3
-        rec_desc = "המניה מציגה שילוב מצוין של תבנית נרות, מומנטום חיובי ויחס סיכוי/סיכון משתלם."
-    elif score >= 1:
-        rec_title = "🟡 להמתין / כניסה בזהירות"
-        rec_rank = 2
-        rec_desc = "יש סימנים חיוביים, אך מומלץ להמתין לאישור נוסף או להגדיר סטופ לוס הדוק."
+    # 4. תבנית נרות (עד 2 נקודות)
+    if pattern_type == "bullish":
+        score_points += 2
+        reasons.append("תבנית נרות שורית להיפוך עליות")
+    elif pattern_type == "bearish":
+        score_points -= 2
+
+    # 5. מדד RSI (עד 1 נקודה)
+    if 35 <= rsi <= 60:
+        score_points += 1
+        reasons.append(f"RSI באזור מומנטום אידיאלי ({rsi:.1f})")
+    elif rsi < 35:
+        score_points += 1
+        reasons.append(f"מכירת יתר - RSI נמוך ({rsi:.1f})")
+
+    # נרמול הציון בדיוק לטווח של 1 עד 10
+    final_score = max(1, min(10, score_points))
+    is_golden_trade = final_score >= 8
+
+    if final_score >= 8:
+        rec_title = f"🏆 עסקת זהב ({final_score}/10)"
+        rec_desc = f"מדד עוצמה גבוה במיוחד: {final_score}/10 (10/10 = הכי חזק). המניה עומדת בקריטריונים האיכותיים ביותר למסחר."
+    elif final_score >= 6:
+        rec_title = f"✅ איתות שורי חזק ({final_score}/10)"
+        rec_desc = f"מדד עוצמה: {final_score}/10. מציגה מומנטום חיובי ויחס סיכוי/סיכון טוב."
+    elif final_score >= 4:
+        rec_title = f"🟡 ניטרלי / בזהירות ({final_score}/10)"
+        rec_desc = f"מדד עוצמה: {final_score}/10. מומלץ להמתין לאישור נוסף או להגדיר סטופ לוס הדוק."
     else:
-        rec_title = "❌ לא מומלץ כרגע"
-        rec_rank = 1
-        rec_desc = "הנתונים מעידים על לחץ מוכרים, RSI גבוה או יחס סיכוי/סיכון לא אטרקטיבי."
+        rec_title = f"🔴 איתות חלש ({final_score}/10)"
+        rec_desc = f"מדד עוצמה נמוך: {final_score}/10 (1/10 = הכי חלש). הנתונים מעידים על סיכון גבוה או חוסר מומנטום."
 
-    return rec_title, rec_rank, rec_desc, is_golden_trade, golden_reasons
+    return rec_title, final_score, rec_desc, is_golden_trade, reasons
 
 def analyze_ticker(user_input, period="6mo"):
     clean_input = user_input.split("-")[0].split("/")[0].strip().replace('"', '').replace("'", "")
@@ -258,28 +245,24 @@ def analyze_ticker(user_input, period="6mo"):
         prefix = "$"
         history_df = df[['Open', 'High', 'Low', 'Close', 'Volume']].copy()
 
-    # חישוב ממוצעים נעים (MA50, MA200)
     history_df['MA50'] = history_df['Close'].rolling(window=50).mean()
     history_df['MA200'] = history_df['Close'].rolling(window=200).mean()
 
     ma50_val = history_df['MA50'].iloc[-1] if not pd.isna(history_df['MA50'].iloc[-1]) else None
     ma200_val = history_df['MA200'].iloc[-1] if not pd.isna(history_df['MA200'].iloc[-1]) else None
 
-    # חישוב נפח מסחר יחסי (RVOL)
     recent_vol = history_df['Volume'].iloc[-1]
     avg_vol_20 = history_df['Volume'].tail(20).mean()
     rvol = float(recent_vol / avg_vol_20) if avg_vol_20 > 0 else 1.0
 
     candle_pattern, pattern_type, candle_desc = detect_candlestick_pattern(history_df)
 
-    # RSI
     delta = history_df['Close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
     rs = gain / loss
     rsi = float((100 - (100 / (1 + rs))).iloc[-1]) if not loss.empty and loss.iloc[-1] != 0 else 50.0
 
-    # ATR
     high_low = history_df['High'] - history_df['Low']
     atr = float(high_low.rolling(14).mean().iloc[-1]) if len(high_low) >= 14 else calc_price * 0.02
 
@@ -293,7 +276,7 @@ def analyze_ticker(user_input, period="6mo"):
     risk_pct = round(((calc_price - stop_loss) / calc_price) * 100, 2)
     ratio = round(potential_gain_pct / risk_pct, 2) if risk_pct > 0 else 0
 
-    rec_title, rec_rank, rec_desc, is_golden, golden_reasons = evaluate_trade_recommendation(
+    rec_title, score_10, rec_desc, is_golden, reasons = calculate_score_and_recommendation(
         pattern_type, rsi, ratio, ma50_val, ma200_val, calc_price, rvol
     )
 
@@ -307,10 +290,10 @@ def analyze_ticker(user_input, period="6mo"):
         "תבנית נר": candle_pattern,
         "הסבר נר": candle_desc,
         "המלצה": str(rec_title),
-        "דירוג המלצה": int(rec_rank),
+        "ציון": int(score_10),
         "הסבר המלצה": rec_desc,
         "עסקת זהב": bool(is_golden),
-        "נימוקי זהב": golden_reasons,
+        "נימוקים": reasons,
         "סטופ לוס": f"{prefix}{stop_loss}",
         "מחיר יעד": f"{prefix}{target}",
         "פוטנציאל רווח (%)": potential_gain_pct,
@@ -325,7 +308,6 @@ def analyze_ticker(user_input, period="6mo"):
 def plot_interactive_chart(df, ticker, prefix):
     fig = go.Figure()
 
-    # מחיר סגירה
     fig.add_trace(go.Scatter(
         x=df.index, 
         y=df['Close'], 
@@ -335,7 +317,6 @@ def plot_interactive_chart(df, ticker, prefix):
         hovertemplate='%{x|%d/%m/%Y}<br>מחיר: ' + prefix + '%{y:.2f}<extra></extra>'
     ))
 
-    # ממוצע נע 50
     if 'MA50' in df.columns:
         fig.add_trace(go.Scatter(
             x=df.index,
@@ -346,7 +327,6 @@ def plot_interactive_chart(df, ticker, prefix):
             hovertemplate='MA50: ' + prefix + '%{y:.2f}<extra></extra>'
         ))
 
-    # ממוצע נע 200
     if 'MA200' in df.columns:
         fig.add_trace(go.Scatter(
             x=df.index,
@@ -363,24 +343,8 @@ def plot_interactive_chart(df, ticker, prefix):
         height=320,
         dragmode=False,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        xaxis=dict(
-            showgrid=True, 
-            zeroline=False, 
-            fixedrange=True,
-            showspikes=True,
-            spikethickness=1.5,
-            spikecolor="#e63946",
-            spikemode="across"
-        ),
-        yaxis=dict(
-            showgrid=True, 
-            zeroline=False, 
-            fixedrange=True,
-            showspikes=True,
-            spikethickness=1.5,
-            spikecolor="#e63946",
-            spikemode="across"
-        )
+        xaxis=dict(showgrid=True, zeroline=False, fixedrange=True),
+        yaxis=dict(showgrid=True, zeroline=False, fixedrange=True)
     )
     return fig
 
@@ -417,51 +381,18 @@ if check_password():
                 st.error(err)
             else:
                 st.success(f"תוצאות ניתוח עבור {res['מניה']}:")
-                if res["עסקת זהב"]:
-                    st.markdown("### 🏆 **המניה זוהתה כעסקת זהב (Golden Trade)!**")
-                    st.info("💡 **נימוקי המערכת:** " + " | ".join(res["נימוקי זהב"]))
-
                 c1, c2 = st.columns([1, 2])
                 with c1:
                     st.metric("מחיר עדכני", res['מחיר עדכני'])
-
-                    c_rec, c_rec_info = st.columns([4, 1])
-                    c_rec.markdown(f"**כדאיות כניסה:** {res['המלצה']}")
-                    with c_rec_info.popover("ℹ️"):
-                        st.write(res['הסבר המלצה'])
-
-                    c_rvol, c_rvol_info = st.columns([4, 1])
-                    c_rvol.markdown(f"**נפח יחסי (RVOL):** {res['RVOL']}x")
-                    with c_rvol_info.popover("ℹ️"):
-                        st.write("נפח מסחר יחסי מול הממוצע ב-20 יום. ערך מעל 1.3 מעיד על כניסת גופים מוסדיים.")
-
-                    c_candle, c_candle_info = st.columns([4, 1])
-                    c_candle.markdown(f"**תבנית נר:** {res['תבנית נר']}")
-                    with c_candle_info.popover("ℹ️"):
-                        st.write(res['הסבר נר'])
-
-                    c_rsi, c_rsi_info = st.columns([4, 1])
-                    c_rsi.markdown(f"**מדד RSI:** {res['RSI']}")
-                    with c_rsi_info.popover("ℹ️"):
-                        st.write("מדד עוצמה יחסית (1-100). מראה מומנטום קונים מול מוכרים.")
-
-                    c_tp, c_tp_info = st.columns([4, 1])
-                    c_tp.markdown(f"**מחיר יעד:** {res['מחיר יעד']}")
-                    with c_tp_info.popover("ℹ️"):
-                        st.write("מחיר יציאה מומלץ למכירה ולקיחת רווחים.")
-
-                    c_sl, c_sl_info = st.columns([4, 1])
-                    c_sl.markdown(f"**קץ סיכון:** {res['סטופ לוס']}")
-                    with c_sl_info.popover("ℹ️"):
-                        st.write("מחיר הגנה לחיתוך הפסד בזמן.")
-
-                    c_rr, c_rr_info = st.columns([4, 1])
-                    c_rr.markdown(f"**יחס סיכוי/סיכון:** {res['יחס סיכוי/סיכון']}")
-                    with c_rr_info.popover("ℹ️"):
-                        st.write("יחס הרווח מול הסיכון. 2.0 ומעלה נחשב יחס מצוין.")
+                    st.markdown(f"**מדד עוצמה (1-10):** {res['המלצה']}")
+                    st.markdown(f"**נפח יחסי (RVOL):** {res['RVOL']}x")
+                    st.markdown(f"**תבנית נר:** {res['תבנית נר']}")
+                    st.markdown(f"**מדד RSI:** {res['RSI']}")
+                    st.markdown(f"**מחיר יעד:** {res['מחיר יעד']}")
+                    st.markdown(f"**קץ סיכון:** {res['סטופ לוס']}")
+                    st.markdown(f"**יחס סיכוי/סיכון:** {res['יחס סיכוי/סיכון']}")
 
                 with c2:
-                    st.caption("גרף אינטראקטיבי כולל ממוצעים נעים MA50 (כתום) ו-MA200 (אדום)")
                     fig = plot_interactive_chart(res['df'], res['מניה'], res['prefix'])
                     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
@@ -471,10 +402,9 @@ if check_password():
     USA_TICKERS = ["AAPL", "NVDA", "TSLA", "AMZN", "GOOGL", "MSFT", "AMD", "META", "NFLX", "INTC"]
     ALL_TICKERS = ISRAEL_TICKERS + USA_TICKERS
 
-    with st.spinner("מריץ סריקה מתקדמת (כולל מודל עסקת זהב)..."):
+    with st.spinner("מריץ סריקה מדורגת (סולם עוצמה 1/10 עד 10/10)..."):
         results_israel = []
         results_usa = []
-        golden_trades = []
         histories_df = {}
         prefixes = {}
 
@@ -485,7 +415,7 @@ if check_password():
                 item = {
                     "מניה": str(res["מניה"]),
                     "כדאיות": str(res["המלצה"]),
-                    "דירוג המלצה": int(res["דירוג המלצה"]),
+                    "ציון": int(res["ציון"]),
                     "עסקת זהב": bool(res["עסקת זהב"]),
                     "מחיר עדכני": str(res["מחיר עדכני"]),
                     "RVOL": f"{res['RVOL']}x",
@@ -497,11 +427,8 @@ if check_password():
                     "מחיר יעד": str(res["מחיר יעד"]),
                     "פוטנציאל רווח (%)": float(res["פוטנציאל רווח (%)"]),
                     "יחס סיכוי/סיכון": float(res["יחס סיכוי/סיכון"]),
-                    "נימוקי זהב": res["נימוקי זהב"]
+                    "נימוקים": res["נימוקים"]
                 }
-                
-                if res["עסקת זהב"]:
-                    golden_trades.append(item)
 
                 if is_israeli:
                     results_israel.append(item)
@@ -511,18 +438,10 @@ if check_password():
                 histories_df[ticker] = res["df"]
                 prefixes[ticker] = res["prefix"]
 
-        # באנר בולט במידה ונמצאו עסקאות זהב
-        if golden_trades:
-            st.subheader("🏆 עסקאות זהב שנמצאו בסריקה הנוכחית!")
-            for g in golden_trades:
-                st.success(f"⭐ **{g['מניה']}** | מחיר: {g['מחיר עדכני']} | פוטנציאל: {g['פוטנציאל רווח (%)']}% | יחס R:R: {g['יחס סיכוי/סיכון']}")
-                st.caption("👈 נימוקים: " + " | ".join(g['נימוקי זהב']))
-            st.markdown("---")
-
         st.subheader("🇮🇱 Top 5 הזדמנויות - הבורסה בתל אביב")
         df_il = pd.DataFrame()
         if results_israel:
-            df_il = pd.DataFrame(results_israel).sort_values(by=["עסקת זהב", "דירוג המלצה", "פוטנציאל רווח (%)"], ascending=[False, False, False]).head(5).reset_index(drop=True)
+            df_il = pd.DataFrame(results_israel).sort_values(by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]).head(5).reset_index(drop=True)
             df_il["מקום"] = [f"#{i+1}" for i in range(len(df_il))]
             display_cols = ["מקום", "מניה", "כדאיות", "מחיר עדכני", "RVOL", "תבנית נר", "RSI", "מחיר יעד", "סטופ לוס", "פוטנציאל רווח (%)"]
             st.dataframe(df_il[display_cols], use_container_width=True, hide_index=True)
@@ -532,7 +451,7 @@ if check_password():
         st.subheader("🇺🇸 Top 5 הזדמנויות - בורסת ארה\"ב")
         df_us = pd.DataFrame()
         if results_usa:
-            df_us = pd.DataFrame(results_usa).sort_values(by=["עסקת זהב", "דירוג המלצה", "פוטנציאל רווח (%)"], ascending=[False, False, False]).head(5).reset_index(drop=True)
+            df_us = pd.DataFrame(results_usa).sort_values(by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]).head(5).reset_index(drop=True)
             df_us["מקום"] = [f"#{i+1}" for i in range(len(df_us))]
             display_cols = ["מקום", "מניה", "כדאיות", "מחיר עדכני", "RVOL", "תבנית נר", "RSI", "מחיר יעד", "סטופ לוס", "פוטנציאל רווח (%)"]
             st.dataframe(df_us[display_cols], use_container_width=True, hide_index=True)
@@ -552,41 +471,15 @@ if check_password():
                     col1, col2 = st.columns([1, 2])
                     with col1:
                         st.markdown(f"**מחיר עדכני:** {row['מחיר עדכני']}")
-                        
-                        c_rec, c_rec_info = st.columns([4, 1])
-                        c_rec.markdown(f"**כדאיות כניסה:** {row['כדאיות']}")
-                        with c_rec_info.popover("ℹ️"):
-                            st.write(row['הסבר המלצה'])
-
-                        c_rvol, c_rvol_info = st.columns([4, 1])
-                        c_rvol.markdown(f"**נפח יחסי (RVOL):** {row['RVOL']}")
-                        with c_rvol_info.popover("ℹ️"):
-                            st.write("נפח מסחר יחסי מול הממוצע. ערך גבוה מעיד על כניסת מוסדיים.")
-
-                        c_candle, c_candle_info = st.columns([4, 1])
-                        c_candle.markdown(f"**תבנית נר:** {row['תבנית נר']}")
-                        with c_candle_info.popover("ℹ️"):
-                            st.write(row['הסבר נר'])
-
-                        c_rsi, c_rsi_info = st.columns([4, 1])
-                        c_rsi.markdown(f"**מדד RSI:** {row['RSI']}")
-                        with c_rsi_info.popover("ℹ️"):
-                            st.write("מדד עוצמה יחסית (1-100). מראה את מומנטום הקונים מול המוכרים.")
-
-                        c_tp, c_tp_info = st.columns([4, 1])
-                        c_tp.markdown(f"**יעד רווח:** {row['מחיר יעד']}")
-                        with c_tp_info.popover("ℹ️"):
-                            st.write("מחיר יציאה מומלץ למימוש רווחים בעסקה.")
-
-                        c_sl, c_sl_info = st.columns([4, 1])
-                        c_sl.markdown(f"**קץ סיכון:** {row['סטופ לוס']}")
-                        with c_sl_info.popover("ℹ️"):
-                            st.write("מחיר הגנה קריטי (Stop Loss) לחיתוך הפסד בזמן.")
-
-                        c_rr, c_rr_info = st.columns([4, 1])
-                        c_rr.markdown(f"**יחס סיכוי/סיכון:** {row['יחס סיכוי/סיכון']}")
-                        with c_rr_info.popover("ℹ️"):
-                            st.write("יחס הרווח מול הסיכון. 2.0 ומעלה נחשב יחס מצוין לעסקה.")
+                        st.markdown(f"**מדד עוצמה:** {row['כדאיות']}")
+                        st.markdown(f"**נפח יחסי (RVOL):** {row['RVOL']}")
+                        st.markdown(f"**תבנית נר:** {row['תבנית נר']}")
+                        st.markdown(f"**מדד RSI:** {row['RSI']}")
+                        st.markdown(f"**יעד רווח:** {row['מחיר יעד']}")
+                        st.markdown(f"**קץ סיכון:** {row['סטופ לוס']}")
+                        st.markdown(f"**יחס סיכוי/סיכון:** {row['יחס סיכוי/סיכון']}")
+                        if row['נימוקים']:
+                            st.info("💡 **גורמי מפתח:** " + " | ".join(row['נימוקים']))
 
                     with col2:
                         fig = plot_interactive_chart(histories_df[ticker_name], ticker_name, prefixes[ticker_name])
