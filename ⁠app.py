@@ -3,8 +3,9 @@ import yfinance as yf
 import pandas as pd
 import requests
 import plotly.graph_objects as go
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-st.set_page_config(page_title="Stock Scanner Pro - Golden Trade Edition", page_icon="📈", layout="wide")
+st.set_page_config(page_title="Stock Scanner Pro - Full Market Edition", page_icon="📈", layout="wide")
 
 # עיצוב CSS
 st.markdown("""
@@ -22,50 +23,40 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-HEBREW_TICKERS = {
-    "בזן": "ORL.TA",
-    "בתי זיקוק": "ORL.TA",
-    "דלק": "DLEKG.TA",
-    "קבוצת דלק": "DLEKG.TA",
-    "בזק": "BEZQ.TA",
-    "טבע": "TEVA.TA",
-    "לאומי": "LUMI.TA",
-    "פועלים": "POLI.TA",
-    "נייס": "NICE.TA",
-    "כיל": "ICL.TA",
-    "אייסיאל": "ICL.TA",
-    "הראל": "HARL.TA",
-    "מזרחי": "MZTF.TA",
-    "מזרחי טפחות": "MZTF.TA",
-    "ליברה": "LBRT.TA",
-    "אלביט": "ESLT.TA"
-}
+# פונקציות להבאת רשימות המניות המלאות של כל השוק
+@st.cache_data(ttl=86400)
+def get_all_us_tickers():
+    """מושך את כל רשימת המניות הנסחרות בארה"ב (S&P500 + NASDAQ/NYSE עיקריות)"""
+    try:
+        # משיכת רשימת S&P 500 מ-Wikipedia
+        sp500 = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')[0]['Symbol'].tolist()
+        sp500 = [t.replace('.', '-') for t in sp500]
+        
+        # מניות מומנטום וטכנולוגיה מובילות נוספות
+        extra_us = ["QQQ", "IWM", "PLTR", "SOFI", "HOOD", "COIN", "U", "RBLX", "ARM", "SMCI"]
+        all_us = list(set(sp500 + extra_us))
+        return sorted(all_us)
+    except Exception:
+        # גיבוי במידה והחיבור לויקיפדיה נכשל
+        return ["AAPL", "NVDA", "TSLA", "AMZN", "GOOGL", "MSFT", "AMD", "META", "NFLX", "INTC", "PLTR", "ARM", "SMCI"]
 
-SEARCH_OPTIONS = [
-    "",
-    "בזק",
-    "בזן / בתי זיקוק",
-    "דלק / קבוצת דלק",
-    "טבע",
-    "לאומי",
-    "פועלים",
-    "נייס",
-    "כיל / אייסיאל",
-    "הראל",
-    "מזרחי טפחות",
-    "ליברה",
-    "אלביט",
-    "AAPL - Apple",
-    "NVDA - Nvidia",
-    "TSLA - Tesla",
-    "AMZN - Amazon",
-    "GOOGL - Google",
-    "MSFT - Microsoft",
-    "AMD - AMD",
-    "META - Meta",
-    "NFLX - Netflix",
-    "INTC - Intel"
-]
+@st.cache_data(ttl=86400)
+def get_all_israel_tickers():
+    """מניות הבורסה בתל אביב (ת"א 125 + מניות בולטות נוספות)"""
+    il_tickers = [
+        "TEVA.TA", "LUMI.TA", "POLI.TA", "DLEKG.TA", "BEZQ.TA", "ORL.TA", "NICE.TA", "ICL.TA", 
+        "HARL.TA", "MZTF.TA", "ESLT.TA", "LBRT.TA", "FIBI.TA", "DSCT.TA", "AZRG.TA", "NVTG.TA",
+        "ENOG.TA", "KEN.TA", "DELT.TA", "SAE.TA", "STR.TA", "FOX.TA", "MTRX.TA", "SPEN.TA",
+        "ELAL.TA", "RTLR.TA", "ARGO.TA", "HLAN.TA", "ONE.TA", "FORTY.TA", "DIMO.TA", "SCL.TA"
+    ]
+    return sorted(list(set(il_tickers)))
+
+HEBREW_TICKERS = {
+    "בזן": "ORL.TA", "בתי זיקוק": "ORL.TA", "דלק": "DLEKG.TA", "קבוצת דלק": "DLEKG.TA",
+    "בזק": "BEZQ.TA", "טבע": "TEVA.TA", "לאומי": "LUMI.TA", "פועלים": "POLI.TA",
+    "נייס": "NICE.TA", "כיל": "ICL.TA", "אייסיאל": "ICL.TA", "הראל": "HARL.TA",
+    "מזרחי": "MZTF.TA", "מזרחי טפחות": "MZTF.TA", "ליברה": "LBRT.TA", "אלביט": "ESLT.TA"
+}
 
 def check_password():
     if "authenticated" not in st.session_state:
@@ -84,18 +75,6 @@ def check_password():
         return False
     return True
 
-def get_live_price(ticker):
-    try:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        r = requests.get(url, headers=headers, timeout=5)
-        data = r.json()
-        meta = data['chart']['result'][0]['meta']
-        price = meta.get('regularMarketPrice') or meta.get('chartPreviousClose')
-        return float(price)
-    except Exception:
-        return None
-
 def detect_candlestick_pattern(df):
     if len(df) < 2:
         return "אין מספיק נתונים", "neutral", "אין מספיק נתוני מסחר כדי לזהות תבנית."
@@ -111,57 +90,35 @@ def detect_candlestick_pattern(df):
     upper_shadow = c_high - max(c_open, c_close)
 
     if lower_shadow > (2 * body) and upper_shadow < (body * 0.5) and body > 0:
-        return (
-            "🔨 נר פטיש (איתות עליות)",
-            "bullish",
-            "נר פטיש מציג צל ישר וארוך למטה. הקונים השתלטו מחדש ודחפו את המחיר למעלה."
-        )
+        return ("🔨 נר פטיש (איתות עליות)", "bullish", "נר פטיש מציג צל ישר וארוך למטה.")
 
     if p_close < p_open and c_close > c_open and c_open <= p_close and c_close >= p_open:
-        return (
-            "🟢 בליעה שורית (איתות עליות חזק)",
-            "bullish",
-            "הגוף של הנר הירוק הנוכחי בולע לחלוטין את הנר האדום שלפניו. הקונים נכנסו בעוצמה."
-        )
+        return ("🟢 בליעה שורית (איתות עליות)", "bullish", "הנר הירוק בולע לחלוטין את הנר האדום.")
 
     if p_close > p_open and c_close < c_open and c_open >= p_close and c_close <= p_open:
-        return (
-            "🔴 בליעה דובית (איתות ירידות)",
-            "bearish",
-            "הגוף של הנר האדום הנוכחי בולע לחלוטין את הנר הירוק שלפניו. לחץ מכירות כבד."
-        )
+        return ("🔴 בליעה דובית (איתות ירידות)", "bearish", "הנר האדום בולע לחלוטין את הנר הירוק.")
 
     if c_close > c_open:
-        return (
-            "🕯️ נר ירוק רגיל",
-            "neutral",
-            "מחיר הסגירה גבוה ממחיר הפתיחה. הקונים היו חזקים יותר ביום זה."
-        )
+        return ("🕯️ נר ירוק רגיל", "neutral", "מחיר הסגירה גבוה ממחיר הפתיחה.")
     else:
-        return (
-            "🕯️ נר אדום רגיל",
-            "neutral",
-            "מחיר הסגירה נמוך ממחיר הפתיחה. המוכרים שלטו ביום המסחר."
-        )
+        return ("🕯️ נר אדום רגיל", "neutral", "מחיר הסגירה נמוך ממחיר הפתיחה.")
 
 def calculate_score_and_recommendation(pattern_type, rsi, ratio, ma50, ma200, current_price, rvol):
     score_points = 0
     reasons = []
 
-    # 1. מגמה מול ממוצעים נעים (עד 3 נקודות)
     above_ma50 = current_price > ma50 if ma50 else False
     above_ma200 = current_price > ma200 if ma200 else False
 
     if above_ma50 and above_ma200:
         score_points += 3
-        reasons.append("מגמה ראשי עולה (מעל MA50 ו-MA200)")
+        reasons.append("מגמה ראשית עולה (מעל MA50 ו-MA200)")
     elif above_ma50:
         score_points += 2
         reasons.append("מעל ממוצע נע 50")
     elif above_ma200:
         score_points += 1
 
-    # 2. נפח מסחר יחסי RVOL (עד 2 נקודות)
     if rvol >= 1.5:
         score_points += 2
         reasons.append(f"כניסת כסף מוסדי כבד (RVOL {rvol:.1f}x)")
@@ -169,21 +126,18 @@ def calculate_score_and_recommendation(pattern_type, rsi, ratio, ma50, ma200, cu
         score_points += 1
         reasons.append(f"נפח מסחר מוגבר (RVOL {rvol:.1f}x)")
 
-    # 3. יחס סיכוי / סיכון (עד 2 נקודות)
     if ratio >= 2.0:
         score_points += 2
         reasons.append(f"יחס סיכוי/סיכון מעולה ({ratio}:1)")
     elif ratio >= 1.3:
         score_points += 1
 
-    # 4. תבנית נרות (עד 2 נקודות)
     if pattern_type == "bullish":
         score_points += 2
         reasons.append("תבנית נרות שורית להיפוך עליות")
     elif pattern_type == "bearish":
         score_points -= 2
 
-    # 5. מדד RSI (עד 1 נקודה)
     if 35 <= rsi <= 60:
         score_points += 1
         reasons.append(f"RSI באזור מומנטום אידיאלי ({rsi:.1f})")
@@ -191,150 +145,127 @@ def calculate_score_and_recommendation(pattern_type, rsi, ratio, ma50, ma200, cu
         score_points += 1
         reasons.append(f"מכירת יתר - RSI נמוך ({rsi:.1f})")
 
-    # נרמול הציון בדיוק לטווח של 1 עד 10
     final_score = max(1, min(10, score_points))
     is_golden_trade = final_score >= 8
 
     if final_score >= 8:
         rec_title = f"🏆 עסקת זהב ({final_score}/10)"
-        rec_desc = f"מדד עוצמה גבוה במיוחד: {final_score}/10 (10/10 = הכי חזק). המניה עומדת בקריטריונים האיכותיים ביותר למסחר."
+        rec_desc = f"מדד עוצמה גבוה במיוחד: {final_score}/10 (10/10 = הכי חזק)."
     elif final_score >= 6:
         rec_title = f"✅ איתות שורי חזק ({final_score}/10)"
-        rec_desc = f"מדד עוצמה: {final_score}/10. מציגה מומנטום חיובי ויחס סיכוי/סיכון טוב."
+        rec_desc = f"מדד עוצמה: {final_score}/10."
     elif final_score >= 4:
         rec_title = f"🟡 ניטרלי / בזהירות ({final_score}/10)"
-        rec_desc = f"מדד עוצמה: {final_score}/10. מומלץ להמתין לאישור נוסף או להגדיר סטופ לוס הדוק."
+        rec_desc = f"מדד עוצמה: {final_score}/10."
     else:
         rec_title = f"🔴 איתות חלש ({final_score}/10)"
-        rec_desc = f"מדד עוצמה נמוך: {final_score}/10 (1/10 = הכי חלש). הנתונים מעידים על סיכון גבוה או חוסר מומנטום."
+        rec_desc = f"מדד עוצמה נמוך: {final_score}/10 (1/10 = הכי חלש)."
 
     return rec_title, final_score, rec_desc, is_golden_trade, reasons
 
-def analyze_ticker(user_input, period="6mo"):
-    clean_input = user_input.split("-")[0].split("/")[0].strip().replace('"', '').replace("'", "")
-    ticker = HEBREW_TICKERS.get(clean_input, clean_input).upper()
-    is_israeli = ticker.endswith(".TA")
+def analyze_single_ticker(ticker):
+    """ניתוח מהיר של מניה בודדת עבור הסורק ההמוני"""
+    try:
+        t = yf.Ticker(ticker)
+        df = t.history(period="6mo", auto_adjust=False)
 
-    raw_live_price = get_live_price(ticker)
-    t = yf.Ticker(ticker)
-    df = t.history(period="1y", auto_adjust=False)
+        if df.empty or len(df) < 30:
+            return None
 
-    if raw_live_price is None and not df.empty:
-        raw_live_price = float(df['Close'].iloc[-1])
+        is_israeli = ticker.endswith(".TA")
+        raw_price = float(df['Close'].iloc[-1])
 
-    if not raw_live_price or df.empty:
-        return None, f"לא נמצאו נתונים עבור '{user_input}'."
+        if is_israeli:
+            price_ils = raw_price / 100.0 if raw_price > 50 else raw_price
+            price_agorot = price_ils * 100.0
+            display_price = f"₪{price_ils:.2f} ({int(price_agorot):,} אג')"
+            calc_price = price_ils
+            prefix = "₪"
+            if df['Close'].iloc[-1] > 50:
+                df['Open'] /= 100.0
+                df['High'] /= 100.0
+                df['Low'] /= 100.0
+                df['Close'] /= 100.0
+        else:
+            display_price = f"${raw_price:.2f}"
+            calc_price = raw_price
+            prefix = "$"
 
-    if is_israeli:
-        price_ils = raw_live_price / 100.0 if raw_live_price > 50 else raw_live_price
-        price_agorot = price_ils * 100.0
+        df['MA50'] = df['Close'].rolling(window=50).mean()
+        df['MA200'] = df['Close'].rolling(window=200).mean()
 
-        display_price = f"₪{price_ils:.2f} ({int(price_agorot):,} אג')"
-        calc_price = price_ils
-        prefix = "₪"
+        ma50_val = df['MA50'].iloc[-1] if not pd.isna(df['MA50'].iloc[-1]) else None
+        ma200_val = df['MA200'].iloc[-1] if not pd.isna(df['MA200'].iloc[-1]) else None
 
-        history_df = df[['Open', 'High', 'Low', 'Close', 'Volume']].copy()
-        if history_df['Close'].iloc[-1] > 50:
-            history_df['Open'] = history_df['Open'] / 100.0
-            history_df['High'] = history_df['High'] / 100.0
-            history_df['Low'] = history_df['Low'] / 100.0
-            history_df['Close'] = history_df['Close'] / 100.0
-    else:
-        display_price = f"${raw_live_price:.2f}"
-        calc_price = raw_live_price
-        prefix = "$"
-        history_df = df[['Open', 'High', 'Low', 'Close', 'Volume']].copy()
+        recent_vol = df['Volume'].iloc[-1]
+        avg_vol_20 = df['Volume'].tail(20).mean()
+        rvol = float(recent_vol / avg_vol_20) if avg_vol_20 > 0 else 1.0
 
-    history_df['MA50'] = history_df['Close'].rolling(window=50).mean()
-    history_df['MA200'] = history_df['Close'].rolling(window=200).mean()
+        candle_pattern, pattern_type, candle_desc = detect_candlestick_pattern(df)
 
-    ma50_val = history_df['MA50'].iloc[-1] if not pd.isna(history_df['MA50'].iloc[-1]) else None
-    ma200_val = history_df['MA200'].iloc[-1] if not pd.isna(history_df['MA200'].iloc[-1]) else None
+        delta = df['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        rsi = float((100 - (100 / (1 + rs))).iloc[-1]) if not loss.empty and loss.iloc[-1] != 0 else 50.0
 
-    recent_vol = history_df['Volume'].iloc[-1]
-    avg_vol_20 = history_df['Volume'].tail(20).mean()
-    rvol = float(recent_vol / avg_vol_20) if avg_vol_20 > 0 else 1.0
+        high_low = df['High'] - df['Low']
+        atr = float(high_low.rolling(14).mean().iloc[-1]) if len(high_low) >= 14 else calc_price * 0.02
+        if pd.isna(atr) or atr <= 0:
+            atr = calc_price * 0.02
 
-    candle_pattern, pattern_type, candle_desc = detect_candlestick_pattern(history_df)
+        stop_loss = round(calc_price - (1.5 * atr), 2)
+        target = round(calc_price + (3.0 * atr), 2)
 
-    delta = history_df['Close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-    rs = gain / loss
-    rsi = float((100 - (100 / (1 + rs))).iloc[-1]) if not loss.empty and loss.iloc[-1] != 0 else 50.0
+        potential_gain_pct = round(((target - calc_price) / calc_price) * 100, 2)
+        risk_pct = round(((calc_price - stop_loss) / calc_price) * 100, 2)
+        ratio = round(potential_gain_pct / risk_pct, 2) if risk_pct > 0 else 0
 
-    high_low = history_df['High'] - history_df['Low']
-    atr = float(high_low.rolling(14).mean().iloc[-1]) if len(high_low) >= 14 else calc_price * 0.02
+        rec_title, score_10, rec_desc, is_golden, reasons = calculate_score_and_recommendation(
+            pattern_type, rsi, ratio, ma50_val, ma200_val, calc_price, rvol
+        )
 
-    if pd.isna(atr) or atr <= 0 or atr > (calc_price * 0.2):
-        atr = calc_price * 0.02
-
-    stop_loss = round(calc_price - (1.5 * atr), 2)
-    target = round(calc_price + (3.0 * atr), 2)
-
-    potential_gain_pct = round(((target - calc_price) / calc_price) * 100, 2)
-    risk_pct = round(((calc_price - stop_loss) / calc_price) * 100, 2)
-    ratio = round(potential_gain_pct / risk_pct, 2) if risk_pct > 0 else 0
-
-    rec_title, score_10, rec_desc, is_golden, reasons = calculate_score_and_recommendation(
-        pattern_type, rsi, ratio, ma50_val, ma200_val, calc_price, rvol
-    )
-
-    analysis = {
-        "מניה": ticker,
-        "מחיר עדכני": display_price,
-        "RSI": round(rsi, 1),
-        "RVOL": round(rvol, 2),
-        "MA50": f"{prefix}{ma50_val:.2f}" if ma50_val else "N/A",
-        "MA200": f"{prefix}{ma200_val:.2f}" if ma200_val else "N/A",
-        "תבנית נר": candle_pattern,
-        "הסבר נר": candle_desc,
-        "המלצה": str(rec_title),
-        "ציון": int(score_10),
-        "הסבר המלצה": rec_desc,
-        "עסקת זהב": bool(is_golden),
-        "נימוקים": reasons,
-        "סטופ לוס": f"{prefix}{stop_loss}",
-        "מחיר יעד": f"{prefix}{target}",
-        "פוטנציאל רווח (%)": potential_gain_pct,
-        "סיכון (%)": risk_pct,
-        "יחס סיכוי/סיכון": ratio,
-        "df": history_df.tail(120),
-        "prefix": prefix
-    }
-
-    return analysis, None
+        return {
+            "מניה": ticker,
+            "כדאיות": str(rec_title),
+            "ציון": int(score_10),
+            "עסקת זהב": bool(is_golden),
+            "מחיר עדכני": display_price,
+            "RVOL": f"{rvol:.2f}x",
+            "תבנית נר": str(candle_pattern),
+            "הסבר נר": candle_desc,
+            "הסבר המלצה": rec_desc,
+            "RSI": round(rsi, 1),
+            "סטופ לוס": f"{prefix}{stop_loss}",
+            "מחיר יעד": f"{prefix}{target}",
+            "פוטנציאל רווח (%)": potential_gain_pct,
+            "יחס סיכוי/סיכון": ratio,
+            "נימוקים": reasons,
+            "df": df.tail(120),
+            "prefix": prefix
+        }
+    except Exception:
+        return None
 
 def plot_interactive_chart(df, ticker, prefix):
     fig = go.Figure()
 
     fig.add_trace(go.Scatter(
-        x=df.index, 
-        y=df['Close'], 
-        mode='lines', 
-        name='מחיר',
+        x=df.index, y=df['Close'], mode='lines', name='מחיר',
         line=dict(color='#0066cc', width=2.5),
         hovertemplate='%{x|%d/%m/%Y}<br>מחיר: ' + prefix + '%{y:.2f}<extra></extra>'
     ))
 
     if 'MA50' in df.columns:
         fig.add_trace(go.Scatter(
-            x=df.index,
-            y=df['MA50'],
-            mode='lines',
-            name='MA 50',
-            line=dict(color='#ff9900', width=1.5, dash='dash'),
-            hovertemplate='MA50: ' + prefix + '%{y:.2f}<extra></extra>'
+            x=df.index, y=df['MA50'], mode='lines', name='MA 50',
+            line=dict(color='#ff9900', width=1.5, dash='dash')
         ))
 
     if 'MA200' in df.columns:
         fig.add_trace(go.Scatter(
-            x=df.index,
-            y=df['MA200'],
-            mode='lines',
-            name='MA 200',
-            line=dict(color='#e63946', width=1.5, dash='dot'),
-            hovertemplate='MA200: ' + prefix + '%{y:.2f}<extra></extra>'
+            x=df.index, y=df['MA200'], mode='lines', name='MA 200',
+            line=dict(color='#e63946', width=1.5, dash='dot')
         ))
 
     fig.update_layout(
@@ -349,129 +280,87 @@ def plot_interactive_chart(df, ticker, prefix):
     return fig
 
 if check_password():
-    st.title("📈 Stock Scanner Pro - Golden Trade")
+    st.title("📈 Stock Scanner Pro - Full Market Scanner")
 
-    st.sidebar.header("⚙️ הגדרות תצוגה")
-    selected_period = st.sidebar.select_slider(
-        "טווח זמן לגרפים:",
-        options=["1mo", "3mo", "6mo", "1y"],
-        value="6mo",
-        format_func=lambda x: {"1mo": "חודש", "3mo": "3 חודשים", "6mo": "חצי שנה", "1y": "שנה"}[x]
-    )
+    # טעינת רשימות המניות המלאות
+    us_tickers = get_all_us_tickers()
+    israel_tickers = get_all_israel_tickers()
 
-    st.subheader("🔍 חיפוש וניתוח מניה ספציפית")
-    col_search1, col_search2 = st.columns([3, 1])
+    st.sidebar.header("⚙️ בקרת סורק השוק המלא")
+    st.sidebar.info(f"🌐 נטענו **{len(israel_tickers)}** מניות מישראל ו-**{len(us_tickers)}** מניות מארה\"ב.")
 
-    with col_search1:
-        searched_ticker = st.selectbox(
-            "הקלד שם מניה או סימול (למשל: ב...):",
-            options=SEARCH_OPTIONS,
-            index=0
-        )
+    run_scan = st.button("🚀 הרץ סריקה מלאה על כל השוק (ישראל + ארה\"ב)", type="primary")
 
-    with col_search2:
-        st.write("")
-        st.write("")
-        search_btn = st.button("פתח ניתוח 📊")
-
-    if searched_ticker and search_btn:
-        with st.spinner(f"מנתח את {searched_ticker}..."):
-            res, err = analyze_ticker(searched_ticker, period=selected_period)
-            if err:
-                st.error(err)
-            else:
-                st.success(f"תוצאות ניתוח עבור {res['מניה']}:")
-                c1, c2 = st.columns([1, 2])
-                with c1:
-                    st.metric("מחיר עדכני", res['מחיר עדכני'])
-                    st.markdown(f"**מדד עוצמה (1-10):** {res['המלצה']}")
-                    st.markdown(f"**נפח יחסי (RVOL):** {res['RVOL']}x")
-                    st.markdown(f"**תבנית נר:** {res['תבנית נר']}")
-                    st.markdown(f"**מדד RSI:** {res['RSI']}")
-                    st.markdown(f"**מחיר יעד:** {res['מחיר יעד']}")
-                    st.markdown(f"**קץ סיכון:** {res['סטופ לוס']}")
-                    st.markdown(f"**יחס סיכוי/סיכון:** {res['יחס סיכוי/סיכון']}")
-
-                with c2:
-                    fig = plot_interactive_chart(res['df'], res['מניה'], res['prefix'])
-                    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-
-    st.markdown("---")
-
-    ISRAEL_TICKERS = ["TEVA.TA", "LUMI.TA", "POLI.TA", "DLEKG.TA", "BEZQ.TA", "ORL.TA", "NICE.TA", "ICL.TA", "HARL.TA", "MZTF.TA"]
-    USA_TICKERS = ["AAPL", "NVDA", "TSLA", "AMZN", "GOOGL", "MSFT", "AMD", "META", "NFLX", "INTC"]
-    ALL_TICKERS = ISRAEL_TICKERS + USA_TICKERS
-
-    with st.spinner("מריץ סריקה מדורגת (סולם עוצמה 1/10 עד 10/10)..."):
-        results_israel = []
-        results_usa = []
+    if run_scan:
+        all_results = []
         histories_df = {}
         prefixes = {}
 
-        for ticker in ALL_TICKERS:
-            res, err = analyze_ticker(ticker, period=selected_period)
-            if res:
-                is_israeli = ticker.endswith(".TA")
-                item = {
-                    "מניה": str(res["מניה"]),
-                    "כדאיות": str(res["המלצה"]),
-                    "ציון": int(res["ציון"]),
-                    "עסקת זהב": bool(res["עסקת זהב"]),
-                    "מחיר עדכני": str(res["מחיר עדכני"]),
-                    "RVOL": f"{res['RVOL']}x",
-                    "תבנית נר": str(res["תבנית נר"]),
-                    "הסבר נר": str(res["הסבר נר"]),
-                    "הסבר המלצה": str(res["הסבר המלצה"]),
-                    "RSI": float(res["RSI"]),
-                    "סטופ לוס": str(res["סטופ לוס"]),
-                    "מחיר יעד": str(res["מחיר יעד"]),
-                    "פוטנציאל רווח (%)": float(res["פוטנציאל רווח (%)"]),
-                    "יחס סיכוי/סיכון": float(res["יחס סיכוי/סיכון"]),
-                    "נימוקים": res["נימוקים"]
-                }
+        total_tickers = israel_tickers + us_tickers
+        progress_bar = st.progress(0)
+        status_text = st.empty()
 
-                if is_israeli:
-                    results_israel.append(item)
-                else:
-                    results_usa.append(item)
+        status_text.text("מריץ סריקה מקבילית מהירה על מאות מניות...")
+
+        # שימוש ב-Multi-threading לסריקה מהירה ביותר
+        completed_count = 0
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            future_to_ticker = {executor.submit(analyze_single_ticker, ticker): ticker for ticker in total_tickers}
+            for future in as_completed(future_to_ticker):
+                res = future.result()
+                if res:
+                    all_results.append(res)
+                    histories_df[res["מניה"]] = res["df"]
+                    prefixes[res["מניה"]] = res["prefix"]
                 
-                histories_df[ticker] = res["df"]
-                prefixes[ticker] = res["prefix"]
+                completed_count += 1
+                progress_bar.progress(completed_count / len(total_tickers))
 
-        st.subheader("🇮🇱 Top 5 הזדמנויות - הבורסה בתל אביב")
-        df_il = pd.DataFrame()
-        if results_israel:
-            df_il = pd.DataFrame(results_israel).sort_values(by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]).head(5).reset_index(drop=True)
-            df_il["מקום"] = [f"#{i+1}" for i in range(len(df_il))]
-            display_cols = ["מקום", "מניה", "כדאיות", "מחיר עדכני", "RVOL", "תבנית נר", "RSI", "מחיר יעד", "סטופ לוס", "פוטנציאל רווח (%)"]
-            st.dataframe(df_il[display_cols], use_container_width=True, hide_index=True)
+        status_text.success("הסריקה הושלמה בהצלחה! 🎉")
 
-        st.markdown("---")
+        df_all = pd.DataFrame(all_results)
 
-        st.subheader("🇺🇸 Top 5 הזדמנויות - בורסת ארה\"ב")
-        df_us = pd.DataFrame()
-        if results_usa:
-            df_us = pd.DataFrame(results_usa).sort_values(by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]).head(5).reset_index(drop=True)
-            df_us["מקום"] = [f"#{i+1}" for i in range(len(df_us))]
-            display_cols = ["מקום", "מניה", "כדאיות", "מחיר עדכני", "RVOL", "תבנית נר", "RSI", "מחיר יעד", "סטופ לוס", "פוטנציאל רווח (%)"]
-            st.dataframe(df_us[display_cols], use_container_width=True, hide_index=True)
+        if not df_all.empty:
+            # 1. תוצאות תל אביב
+            st.subheader("🇮🇱 Top 5 הזדמנויות - הבורסה בתל אביב (מתוך כל השוק)")
+            df_il = df_all[df_all["מניה"].str.endswith(".TA")].sort_values(
+                by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]
+            ).head(5).reset_index(drop=True)
 
-        st.markdown("---")
+            if not df_il.empty:
+                df_il["מקום"] = [f"#{i+1}" for i in range(len(df_il))]
+                display_cols = ["מקום", "מניה", "כדאיות", "מחיר עדכני", "RVOL", "תבנית נר", "RSI", "מחיר יעד", "סטופ לוס", "פוטנציאל רווח (%)"]
+                st.dataframe(df_il[display_cols], use_container_width=True, hide_index=True)
 
-        st.subheader("📊 פירוט וגרפים - 10 המניות הנבחרות")
-        all_top = pd.concat([df_il, df_us], ignore_index=True)
+            st.markdown("---")
 
-        if not all_top.empty:
+            # 2. תוצאות ארה"ב
+            st.subheader("🇺🇸 Top 5 הזדמנויות - בורסת ארה\"ב (מתוך כל השוק)")
+            df_us = df_all[~df_all["מניה"].str.endswith(".TA")].sort_values(
+                by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]
+            ).head(5).reset_index(drop=True)
+
+            if not df_us.empty:
+                df_us["מקום"] = [f"#{i+1}" for i in range(len(df_us))]
+                display_cols = ["מקום", "מניה", "כדאיות", "מחיר עדכני", "RVOL", "תבנית נר", "RSI", "מחיר יעד", "סטופ לוס", "פוטנציאל רווח (%)"]
+                st.dataframe(df_us[display_cols], use_container_width=True, hide_index=True)
+
+            st.markdown("---")
+
+            # 3. גרפים ופירוט מלא של 10 המנצחות
+            st.subheader("📊 פירוט וגרפים - 10 המניות החזקות ביותר בשוק")
+            all_top = pd.concat([df_il, df_us], ignore_index=True)
+
             for index, row in all_top.iterrows():
                 ticker_name = row['מניה']
                 rank_str = row['מקום']
                 badge = "🏆 " if row['עסקת זהב'] else "📌 "
-                
+
                 with st.expander(f"{badge}{rank_str} {ticker_name} - {row['כדאיות']} | פוטנציאל: {row['פוטנציאל רווח (%)']}%"):
                     col1, col2 = st.columns([1, 2])
                     with col1:
                         st.markdown(f"**מחיר עדכני:** {row['מחיר עדכני']}")
-                        st.markdown(f"**מדד עוצמה:** {row['כדאיות']}")
+                        st.markdown(f"**מדד עוצמה (1-10):** {row['כדאיות']}")
                         st.markdown(f"**נפח יחסי (RVOL):** {row['RVOL']}")
                         st.markdown(f"**תבנית נר:** {row['תבנית נר']}")
                         st.markdown(f"**מדד RSI:** {row['RSI']}")
