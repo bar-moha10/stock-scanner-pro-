@@ -25,19 +25,16 @@ if check_password():
     st.title("📈 Stock Scanner Pro - Top 5 Opportunities")
     st.markdown("סורק ומדרג את **5 ההזדמנויות המובילות** מתוך רשימת מעקב גלובלית וישראלית.")
 
-    # רשימה משולבת: ארה"ב + מניות מובילות מתל אביב (.TA)
     DEFAULT_TICKERS = [
         "AAPL", "NVDA", "TSLA", "AMZN", "GOOGL", "MSFT", "AMD", "META",
         "TEVA.TA", "LUMI.TA", "POLI.TA", "DLEKG.TA", "BEZQ.TA", "ORL.TA", "NICE.TA"
     ]
 
-    # הרצת הסריקה באופן אוטומטי בעת טעינת העמוד
     with st.spinner("סורק ומדרג מניות בלייב..."):
         results = []
         histories = {}
 
         try:
-            # משיכת נתונים מרוכזת ומהירה לכל המניות יחד
             data = yf.download(DEFAULT_TICKERS, period="3mo", group_by="ticker", progress=False)
 
             for ticker in DEFAULT_TICKERS:
@@ -46,6 +43,13 @@ if check_password():
                     if len(df) > 20:
                         close_prices = df['Close']
                         current_price = float(close_prices.iloc[-1])
+
+                        # המרה מאגורות לשקלים עבור מניות ישראליות
+                        is_israeli = ticker.endswith(".TA")
+                        factor = 100.0 if is_israeli else 1.0
+                        currency_symbol = "₪" if is_israeli else "$"
+
+                        display_price = current_price / factor
 
                         # חישוב RSI
                         delta = close_prices.diff()
@@ -56,26 +60,26 @@ if check_password():
 
                         # חישוב תנודתיות ATR
                         high_low = df['High'] - df['Low']
-                        atr = float(high_low.rolling(14).mean().iloc[-1])
+                        atr = float(high_low.rolling(14).mean().iloc[-1]) / factor
 
-                        stop_loss = round(current_price - (1.5 * atr), 2)
-                        target = round(current_price + (3.0 * atr), 2)
+                        stop_loss = round(display_price - (1.5 * atr), 2)
+                        target = round(display_price + (3.0 * atr), 2)
 
-                        potential_gain_pct = round(((target - current_price) / current_price) * 100, 2)
-                        risk_pct = round(((current_price - stop_loss) / current_price) * 100, 2)
+                        potential_gain_pct = round(((target - display_price) / display_price) * 100, 2)
+                        risk_pct = round(((display_price - stop_loss) / display_price) * 100, 2)
                         ratio = round(potential_gain_pct / risk_pct, 2) if risk_pct > 0 else 0
 
                         results.append({
                             "מניה": ticker,
-                            "מחיר": round(current_price, 2),
+                            "מחיר": f"{currency_symbol}{round(display_price, 2)}",
                             "RSI": round(rsi, 1),
-                            "סטופ לוס": stop_loss,
-                            "מחיר יעד": target,
+                            "סטופ לוס": f"{currency_symbol}{stop_loss}",
+                            "מחיר יעד": f"{currency_symbol}{target}",
                             "פוטנציאל רווח (%)": potential_gain_pct,
                             "סיכון (%)": risk_pct,
                             "יחס סיכוי/סיכון": ratio
                         })
-                        histories[ticker] = close_prices
+                        histories[ticker] = close_prices / factor
                 except Exception:
                     continue
         except Exception:
