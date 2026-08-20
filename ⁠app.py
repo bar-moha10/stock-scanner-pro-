@@ -36,23 +36,15 @@ if check_password():
         histories = {}
 
         try:
-            # הורדה מרוכזת אחת לכל הטיקרים כדי למנוע חסימות וטבלאות ריקות
-            data = yf.download(ALL_TICKERS, period="3mo", auto_adjust=False, progress=False)
+            # הורדה מרוכזת עם group_by='ticker' ו-auto_adjust=False למניעת שיבוש מחירים
+            data = yf.download(ALL_TICKERS, period="3mo", auto_adjust=False, group_by='ticker', progress=False)
 
             for ticker in ALL_TICKERS:
                 try:
-                    # שליפת סדרת Close ללא התאמות
-                    if len(ALL_TICKERS) > 1:
-                        close_series = data['Close'][ticker].dropna()
-                        high_series_raw = data['High'][ticker].dropna()
-                        low_series_raw = data['Low'][ticker].dropna()
-                    else:
-                        close_series = data['Close'].dropna()
-                        high_series_raw = data['High'].dropna()
-                        low_series_raw = data['Low'].dropna()
+                    df = data[ticker].dropna(subset=['Close'])
 
-                    if not close_series.empty and len(close_series) > 20:
-                        last_price = float(close_series.iloc[-1])
+                    if not df.empty and len(df) > 10:
+                        last_price = float(df['Close'].iloc[-1])
                         is_israeli = ticker.endswith(".TA")
 
                         if is_israeli:
@@ -64,17 +56,17 @@ if check_password():
                             calc_price = price_ils
                             prefix = "₪"
 
-                            history_series = close_series / 100.0
-                            high_series = high_series_raw / 100.0
-                            low_series = low_series_raw / 100.0
+                            history_series = df['Close'] / 100.0
+                            high_series = df['High'] / 100.0
+                            low_series = df['Low'] / 100.0
                         else:
                             display_price = f"${last_price:.2f}"
                             calc_price = last_price
                             prefix = "$"
 
-                            history_series = close_series
-                            high_series = high_series_raw
-                            low_series = low_series_raw
+                            history_series = df['Close']
+                            high_series = df['High']
+                            low_series = df['Low']
 
                         # חישוב RSI
                         delta = history_series.diff()
