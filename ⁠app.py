@@ -24,7 +24,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# מילון תרגום לשמות בעברית ולמספרי הבורסה (מספר נייר ערך) למניות ישראל
 ISRAEL_STOCKS_INFO = {
     "TEVA.TA": {"name": "טבע", "id": "1081124"},
     "LUMI.TA": {"name": "בנק לאומי", "id": "604011"},
@@ -168,7 +167,6 @@ def analyze_single_ticker(ticker):
             if raw_price > 50:
                 df[['Open', 'High', 'Low', 'Close']] /= 100.0
             
-            # שליפת שם בעברית ומספר נייר ערך
             stock_info = ISRAEL_STOCKS_INFO.get(ticker, {"name": ticker, "id": "לא ידוע"})
             display_name = stock_info["name"]
             stock_id = stock_info["id"]
@@ -258,7 +256,13 @@ if check_password():
     with st.sidebar:
         st.header("⚙️ בקרת מערכת")
         st.success("מחובר כמשתמש: **shemi**")
-        run_scan = st.button("🚀 הפעל סריקת שוק מלאה", type="primary")
+        run_scan_sidebar = st.button("🚀 הפעל סריקת שוק מלאה (צד)", type="primary")
+
+    # כפתור ראשי גדול במרכז המסך (נוח במיוחד לניידים שבהם התפריט סגור)
+    st.markdown("### 🔍 התחלת עבודה")
+    run_scan_main = st.button("🚀 הפעל סריקת שוק מלאה עכשיו", type="primary", use_container_width=True)
+
+    run_scan = run_scan_sidebar or run_scan_main
 
     if run_scan:
         all_results = []
@@ -299,7 +303,6 @@ if check_password():
                 else:
                     for idx, row in df_il.iterrows():
                         badge = "🏆" if row['עסקת זהב'] else "📌"
-                        # מציג את השם בעברית, מספר נייר הערך, והסימבול
                         title_text = f"{badge} #{idx+1} | {row['שם תצוגה']} (מס' נייר: {row['מספר נייר']} | סימבול: {row['מניה']})"
                         
                         with st.expander(title_text):
@@ -349,4 +352,4 @@ if check_password():
                                 fig = plot_interactive_chart(histories_df[row['מניה']], row['מניה'], prefixes[row['מניה']])
                                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
     else:
-        st.info("👈 לחץ על **'הפעל סריקת שוק מלאה'** בתפריט הצדדי כדי לטעון את רשימות ה-Top 10.")
+        st.info("👈 לחץ על כפתור **'הפעל סריקת שוק מלאה עכשיו'** שמופיע ממש כאן למעלה כדי לטעון את רשימות ה-Top 10.")
