@@ -251,7 +251,6 @@ def plot_interactive_chart(df, ticker, prefix):
 if check_password():
     st.title("📈 Stock Scanner Pro - Top 10")
     
-    # אתחול תיק וירטואלי בזיכרון
     if "virtual_portfolio" not in st.session_state:
         st.session_state["virtual_portfolio"] = []
 
@@ -296,7 +295,6 @@ if check_password():
         st.session_state["histories_df"] = histories_df
         st.session_state["prefixes"] = prefixes
 
-    # הצגת הטאבים כולל טאב לתיק הווירטואלי החדש
     if "df_all" in st.session_state and not st.session_state["df_all"].empty:
         df_all = st.session_state["df_all"]
         histories_df = st.session_state["histories_df"]
@@ -371,18 +369,23 @@ if check_password():
         with tab_portfolio:
             st.subheader("💼 ניהול תיק השקעות וירטואלי")
             
-            # טופס הוספת עסקה לתיק
             with st.form("add_trade_form"):
                 st.markdown("**הוסף עסקת רכישה חדשה:**")
                 col_f1, col_f2, col_f3 = st.columns(3)
                 
                 with col_f1:
-                    all_available_tickers = df_all["מניה"].tolist()
-                    selected_ticker_port = st.selectbox("בחר מניה מהסורק", all_available_tickers)
+                    # יצירת מילון מיפוי שמציג את השם בעברית יחד עם הסימבול (למשל: בזן (ORL.TA))
+                    ticker_options = {}
+                    for _, r in df_all.iterrows():
+                        display_label = f"{r['שם תצוגה']} ({r['מניה']})"
+                        ticker_options[display_label] = r['מניה']
+                    
+                    selected_label = st.selectbox("בחר מניה (ניתן להקליד שם בעברית או סימבול)", list(ticker_options.keys()))
+                    selected_ticker_port = ticker_options[selected_label]
+
                 with col_f2:
                     shares_qty = st.number_input("כמות יחידות", min_value=1, value=100)
                 with col_f3:
-                    # מציאת מחיר התחלתי משוער מהסורק
                     default_price_row = df_all[df_all["מניה"] == selected_ticker_port]
                     def_val = float(default_price_row["מחיר מספרי"].values[0]) if not default_price_row.empty else 10.0
                     buy_price = st.number_input("מחיר קנייה ליחידה", min_value=0.01, value=def_val, format="%.2f")
@@ -412,7 +415,6 @@ if check_password():
                     shares = trade["shares"]
                     buy_price = trade["buy_price"]
                     
-                    # שליפת מחיר עדכני מהסורק
                     match_row = df_all[df_all["מניה"] == ticker]
                     if not match_row.empty:
                         current_price = float(match_row["מחיר מספרי"].values[0])
