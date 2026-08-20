@@ -216,6 +216,7 @@ def analyze_single_ticker(ticker):
             "ציון": score_10,
             "עסקת זהב": is_golden,
             "מחיר עדכני": display_price,
+            "מחיר מספרי": calc_price,
             "RVOL": f"{rvol:.2f}x",
             "תבנית נר": candle_pattern,
             "RSI": round(rsi, 1),
@@ -250,6 +251,10 @@ def plot_interactive_chart(df, ticker, prefix):
 if check_password():
     st.title("📈 Stock Scanner Pro - Top 10")
     
+    # אתחול תיק וירטואלי בזיכרון
+    if "virtual_portfolio" not in st.session_state:
+        st.session_state["virtual_portfolio"] = []
+
     us_tickers = get_all_us_tickers()
     israel_tickers = get_all_israel_tickers()
 
@@ -287,70 +292,171 @@ if check_password():
 
         status_text.success("הסריקה הסתיימה!")
         df_all = pd.DataFrame(all_results)
+        st.session_state["df_all"] = df_all
+        st.session_state["histories_df"] = histories_df
+        st.session_state["prefixes"] = prefixes
 
-        if not df_all.empty:
-            tab_il, tab_us = st.tabs(["🇮🇱 מניות ישראל (Top 10)", "🇺🇸 מניות ארה\"ב (Top 10)"])
+    # הצגת הטאבים כולל טאב לתיק הווירטואלי החדש
+    if "df_all" in st.session_state and not st.session_state["df_all"].empty:
+        df_all = st.session_state["df_all"]
+        histories_df = st.session_state["histories_df"]
+        prefixes = st.session_state["prefixes"]
 
-            with tab_il:
-                st.subheader("10 המניות החזקות ביותר בבורסת תל אביב")
-                df_il = df_all[df_all["מניה"].str.endswith(".TA")].sort_values(
-                    by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]
-                ).head(10).reset_index(drop=True)
+        tab_il, tab_us, tab_portfolio = st.tabs([
+            "🇮🇱 מניות ישראל (Top 10)", 
+            "🇺🇸 מניות ארה\"ב (Top 10)", 
+            "💼 תיק וירטואלי"
+        ])
 
-                if df_il.empty:
-                    st.info("אין מספיק נתונים כרגע למניות ישראל.")
-                else:
-                    for idx, row in df_il.iterrows():
-                        badge = "🏆" if row['עסקת זהב'] else "📌"
-                        # תצוגה נקייה: דירוג, שם בעברית, מספר נייר וסימבול
-                        title_text = f"{badge} #{idx+1} | {row['שם תצוגה']} ({row['מספר נייר']} / {row['מניה']})"
-                        
-                        with st.expander(title_text):
-                            c1, c2 = st.columns([1, 1.5])
-                            with c1:
-                                st.markdown(f"**מחיר עדכני:** {row['מחיר עדכני']}")
-                                st.markdown(f"**ציון מערכת:** {row['כדאיות']}")
-                                st.markdown(f"**נפח מסחר יחסי:** {row['RVOL']}")
-                                st.markdown(f"**תבנית נר:** {row['תבנית נר']}")
-                                st.markdown(f"**RSI:** {row['RSI']}")
-                                st.markdown(f"**יעד רווח:** {row['מחיר יעד']}")
-                                st.markdown(f"**סטופ לוס:** {row['סטופ לוס']}")
-                                st.markdown(f"**פוטנציאל רווח:** {row['פוטנציאל רווח (%)']}%")
-                                if row['נימוקים']:
-                                    st.info("💡 " + " | ".join(row['נימוקים']))
-                            with c2:
-                                fig = plot_interactive_chart(histories_df[row['מניה']], row['מניה'], prefixes[row['מניה']])
-                                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+        with tab_il:
+            st.subheader("10 המניות החזקות ביותר בבורסת תל אביב")
+            df_il = df_all[df_all["מניה"].str.endswith(".TA")].sort_values(
+                by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]
+            ).head(10).reset_index(drop=True)
 
-            with tab_us:
-                st.subheader("10 המניות החזקות ביותר בבורסת ארה\"ב")
-                df_us = df_all[~df_all["מניה"].str.endswith(".TA")].sort_values(
-                    by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]
-                ).head(10).reset_index(drop=True)
+            if df_il.empty:
+                st.info("אין מספיק נתונים כרגע למניות ישראל.")
+            else:
+                for idx, row in df_il.iterrows():
+                    badge = "🏆" if row['עסקת זהב'] else "📌"
+                    title_text = f"{badge} #{idx+1} | {row['שם תצוגה']} ({row['מספר נייר']} / {row['מניה']})"
+                    
+                    with st.expander(title_text):
+                        c1, c2 = st.columns([1, 1.5])
+                        with c1:
+                            st.markdown(f"**מחיר עדכני:** {row['מחיר עדכני']}")
+                            st.markdown(f"**ציון מערכת:** {row['כדאיות']}")
+                            st.markdown(f"**נפח מסחר יחסי:** {row['RVOL']}")
+                            st.markdown(f"**תבנית נר:** {row['תבנית נר']}")
+                            st.markdown(f"**RSI:** {row['RSI']}")
+                            st.markdown(f"**יעד רווח:** {row['מחיר יעד']}")
+                            st.markdown(f"**סטופ לוס:** {row['סטופ לוס']}")
+                            st.markdown(f"**פוטנציאל רווח:** {row['פוטנציאל רווח (%)']}%")
+                            if row['נימוקים']:
+                                st.info("💡 " + " | ".join(row['נימוקים']))
+                        with c2:
+                            fig = plot_interactive_chart(histories_df[row['מניה']], row['מניה'], prefixes[row['מניה']])
+                            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-                if df_us.empty:
-                    st.info("אין מספיק נתונים כרגע למניות ארה\"ב.")
-                else:
-                    for idx, row in df_us.iterrows():
-                        badge = "🏆" if row['עסקת זהב'] else "📌"
-                        # תצוגה נקייה למניות ארה"ב: דירוג וסימבול
-                        title_text = f"{badge} #{idx+1} | {row['מניה']}"
+        with tab_us:
+            st.subheader("10 המניות החזקות ביותר בבורסת ארה\"ב")
+            df_us = df_all[~df_all["מניה"].str.endswith(".TA")].sort_values(
+                by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]
+            ).head(10).reset_index(drop=True)
 
-                        with st.expander(title_text):
-                            c1, c2 = st.columns([1, 1.5])
-                            with c1:
-                                st.markdown(f"**מחיר עדכני:** {row['מחיר עדכני']}")
-                                st.markdown(f"**ציון מערכת:** {row['כדאיות']}")
-                                st.markdown(f"**נפח מסחר יחסי:** {row['RVOL']}")
-                                st.markdown(f"**תבנית נר:** {row['תבנית נר']}")
-                                st.markdown(f"**RSI:** {row['RSI']}")
-                                st.markdown(f"**יעד רווח:** {row['מחיר יעד']}")
-                                st.markdown(f"**סטופ לוס:** {row['סטופ לוס']}")
-                                st.markdown(f"**פוטנציאל רווח:** {row['פוטנציאל רווח (%)']}%")
-                                if row['נימוקים']:
-                                    st.info("💡 " + " | ".join(row['נימוקים']))
-                            with c2:
-                                fig = plot_interactive_chart(histories_df[row['מניה']], row['מניה'], prefixes[row['מניה']])
-                                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            if df_us.empty:
+                st.info("אין מספיק נתונים כרגע למניות ארה\"ב.")
+            else:
+                for idx, row in df_us.iterrows():
+                    badge = "🏆" if row['עסקת זהב'] else "📌"
+                    title_text = f"{badge} #{idx+1} | {row['מניה']}"
+
+                    with st.expander(title_text):
+                        c1, c2 = st.columns([1, 1.5])
+                        with c1:
+                            st.markdown(f"**מחיר עדכני:** {row['מחיר עדכני']}")
+                            st.markdown(f"**ציון מערכת:** {row['כדאיות']}")
+                            st.markdown(f"**נפח מסחר יחסי:** {row['RVOL']}")
+                            st.markdown(f"**תבנית נר:** {row['תבנית נר']}")
+                            st.markdown(f"**RSI:** {row['RSI']}")
+                            st.markdown(f"**יעד רווח:** {row['מחיר יעד']}")
+                            st.markdown(f"**סטופ לוס:** {row['סטופ לוס']}")
+                            st.markdown(f"**פוטנציאל רווח:** {row['פוטנציאל רווח (%)']}%")
+                            if row['נימוקים']:
+                                st.info("💡 " + " | ".join(row['נימוקים']))
+                        with c2:
+                            fig = plot_interactive_chart(histories_df[row['מניה']], row['מניה'], prefixes[row['מניה']])
+                            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+
+        with tab_portfolio:
+            st.subheader("💼 ניהול תיק השקעות וירטואלי")
+            
+            # טופס הוספת עסקה לתיק
+            with st.form("add_trade_form"):
+                st.markdown("**הוסף עסקת רכישה חדשה:**")
+                col_f1, col_f2, col_f3 = st.columns(3)
+                
+                with col_f1:
+                    all_available_tickers = df_all["מניה"].tolist()
+                    selected_ticker_port = st.selectbox("בחר מניה מהסורק", all_available_tickers)
+                with col_f2:
+                    shares_qty = st.number_input("כמות יחידות", min_value=1, value=100)
+                with col_f3:
+                    # מציאת מחיר התחלתי משוער מהסורק
+                    default_price_row = df_all[df_all["מניה"] == selected_ticker_port]
+                    def_val = float(default_price_row["מחיר מספרי"].values[0]) if not default_price_row.empty else 10.0
+                    buy_price = st.number_input("מחיר קנייה ליחידה", min_value=0.01, value=def_val, format="%.2f")
+                
+                submit_trade = st.form_submit_button("➕ הוסף לתיק", type="primary")
+                if submit_trade:
+                    st.session_state["virtual_portfolio"].append({
+                        "ticker": selected_ticker_port,
+                        "shares": shares_qty,
+                        "buy_price": buy_price
+                    })
+                    st.success("העסקה נוספה בהצלחה לתיק!")
+                    st.rerun()
+
+            st.markdown("---")
+            st.markdown("### 📊 מצב התיק הנוכחי שלך")
+            
+            if not st.session_state["virtual_portfolio"]:
+                st.info("התיק שלך ריק כרגע. הוסף עסקאות באמצעות הטופס למעלה.")
+            else:
+                portfolio_rows = []
+                total_invested = 0
+                total_current_value = 0
+
+                for i, trade in enumerate(st.session_state["virtual_portfolio"]):
+                    ticker = trade["ticker"]
+                    shares = trade["shares"]
+                    buy_price = trade["buy_price"]
+                    
+                    # שליפת מחיר עדכני מהסורק
+                    match_row = df_all[df_all["מניה"] == ticker]
+                    if not match_row.empty:
+                        current_price = float(match_row["מחיר מספרי"].values[0])
+                        prefix = match_row["prefix"].values[0]
+                        display_name = match_row["שם תצוגה"].values[0]
+                    else:
+                        current_price = buy_price
+                        prefix = "$"
+                        display_name = ticker
+
+                    invested = shares * buy_price
+                    current_val = shares * current_price
+                    pnl_ils = current_val - invested
+                    pnl_pct = ((current_price - buy_price) / buy_price) * 100 if buy_price > 0 else 0
+
+                    total_invested += invested
+                    total_current_value += current_val
+
+                    portfolio_rows.append({
+                        "מניה": display_name,
+                        "סימבול": ticker,
+                        "כמות": shares,
+                        "מחיר קנייה": f"{prefix}{buy_price:.2f}",
+                        "מחיר נוכחי": f"{prefix}{current_price:.2f}",
+                        "שווי נוכחי": f"{prefix}{current_val:.2f}",
+                        "רווח/הפסד (₪/$)": f"{prefix}{pnl_ils:+.2f}",
+                        "תשואה (%)": f"{pnl_pct:+.2f}%",
+                        "raw_pnl": pnl_ils
+                    })
+
+                df_port = pd.DataFrame(portfolio_rows)
+                st.dataframe(df_port.drop(columns=["raw_pnl"]), use_container_width=True)
+
+                total_pnl = total_current_value - total_invested
+                total_pnl_pct = ((total_current_value - total_invested) / total_invested) * 100 if total_invested > 0 else 0
+
+                col_m1, col_m2, col_m3 = st.columns(3)
+                col_m1.metric("סה\"כ השקעה", f"{total_invested:,.2f}")
+                col_m2.metric("שווי נוכחי של התיק", f"{total_current_value:,.2f}")
+                col_m3.metric("רווח / הפסד כולל", f"{total_pnl:+,.2f}", f"{total_pnl_pct:+.2f}%")
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("🗑️ נקה את כל התיק"):
+                    st.session_state["virtual_portfolio"] = []
+                    st.rerun()
     else:
-        st.info("👈 לחץ על כפתור **'הפעל סריקת שוק מלאה עכשיו'** שמופיע ממש כאן למעלה כדי לטעון את רשימות ה-Top 10.")
+        st.info("👈 לחץ על כפתור **'הפעל סריקת שוק מלאה עכשיו'** כדי לטעון את הנתונים ולנהל את התיק הווירטואלי.")
