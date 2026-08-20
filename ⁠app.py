@@ -371,34 +371,43 @@ if check_password():
             
             with st.form("add_trade_form"):
                 st.markdown("**הוסף עסקת רכישה חדשה:**")
-                col_f1, col_f2, col_f3 = st.columns(3)
                 
-                with col_f1:
-                    # יצירת מילון מיפוי שמציג את השם בעברית יחד עם הסימבול (למשל: בזן (ORL.TA))
-                    ticker_options = {}
-                    for _, r in df_all.iterrows():
-                        display_label = f"{r['שם תצוגה']} ({r['מניה']})"
-                        ticker_options[display_label] = r['מניה']
-                    
-                    selected_label = st.selectbox("בחר מניה (ניתן להקליד שם בעברית או סימבול)", list(ticker_options.keys()))
-                    selected_ticker_port = ticker_options[selected_label]
+                ticker_options = {}
+                for _, r in df_all.iterrows():
+                    display_label = f"{r['שם תצוגה']} ({r['מניה']})"
+                    ticker_options[display_label] = r['מניה']
+                
+                selected_label = st.selectbox("בחר מניה (ניתן להקליד שם בעברית או סימבול)", list(ticker_options.keys()))
+                selected_ticker_port = ticker_options[selected_label]
 
+                default_price_row = df_all[df_all["מניה"] == selected_ticker_port]
+                def_val = float(default_price_row["מחיר מספרי"].values[0]) if not default_price_row.empty else 10.0
+
+                col_f1, col_f2 = st.columns(2)
+                with col_f1:
+                    purchase_mode = st.radio("צורת רכישה:", ["לפי כמות יחידות", "לפי סכום כסף השקעה"])
                 with col_f2:
-                    shares_qty = st.number_input("כמות יחידות", min_value=1, value=100)
-                with col_f3:
-                    default_price_row = df_all[df_all["מניה"] == selected_ticker_port]
-                    def_val = float(default_price_row["מחיר מספרי"].values[0]) if not default_price_row.empty else 10.0
                     buy_price = st.number_input("מחיר קנייה ליחידה", min_value=0.01, value=def_val, format="%.2f")
-                
+
+                if purchase_mode == "לפי כמות יחידות":
+                    shares_qty = st.number_input("כמות יחידות", min_value=1, value=100)
+                else:
+                    investment_amount = st.number_input("סכום כסף להשקעה (₪/$)", min_value=1.0, value=100000.0, format="%.2f")
+                    shares_qty = int(investment_amount // buy_price) if buy_price > 0 else 0
+                    st.caption(f"💡 לפי המחיר הנוכחי, הסכום יקנה לך בקירוב: **{shares_qty} יחידות**")
+
                 submit_trade = st.form_submit_button("➕ הוסף לתיק", type="primary")
                 if submit_trade:
-                    st.session_state["virtual_portfolio"].append({
-                        "ticker": selected_ticker_port,
-                        "shares": shares_qty,
-                        "buy_price": buy_price
-                    })
-                    st.success("העסקה נוספה בהצלחה לתיק!")
-                    st.rerun()
+                    if shares_qty <= 0:
+                        st.error("הסכום שהוזן קטן מדי מכדי לקנות אפילו יחידה אחת שלמה.")
+                    else:
+                        st.session_state["virtual_portfolio"].append({
+                            "ticker": selected_ticker_port,
+                            "shares": shares_qty,
+                            "buy_price": buy_price
+                        })
+                        st.success(f"העסקה נוספה בהצלחה! ({shares_qty} יחידות)")
+                        st.rerun()
 
             st.markdown("---")
             st.markdown("### 📊 מצב התיק הנוכחי שלך")
