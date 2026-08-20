@@ -4,7 +4,6 @@ import pandas as pd
 import plotly.graph_objects as go
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# הגדרת עמוד רחב ומותאם
 st.set_page_config(
     page_title="Stock Scanner Pro", 
     page_icon="📈", 
@@ -12,7 +11,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# עיצוב CSS נקי וממוסגר
 st.markdown("""
     <style>
     .main {
@@ -26,6 +24,42 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# מילון תרגום לשמות בעברית ולמספרי הבורסה (מספר נייר ערך) למניות ישראל
+ISRAEL_STOCKS_INFO = {
+    "TEVA.TA": {"name": "טבע", "id": "1081124"},
+    "LUMI.TA": {"name": "בנק לאומי", "id": "604011"},
+    "POLI.TA": {"name": "בנק הפועלים", "id": "662577"},
+    "DLEKG.TA": {"name": "קבוצת דלק", "id": "1081116"},
+    "BEZQ.TA": {"name": "בזק", "id": "238011"},
+    "ORL.TA": {"name": "בזן (בתי זיקוק)", "id": "401011"},
+    "NICE.TA": {"name": "נייס", "id": "1081132"},
+    "ICL.TA": {"name": "כיל / איי.סי.אל", "id": "281014"},
+    "HARL.TA": {"name": "הראל השקעות", "id": "259016"},
+    "MZTF.TA": {"name": "מזרחי טפחות", "id": "698019"},
+    "ESLT.TA": {"name": "אלביט מערכות", "id": "108112"},
+    "LBRT.TA": {"name": "ליברה ביטוח", "id": "1160356"},
+    "FIBI.TA": {"name": "הבינלאומי", "id": "1081140"},
+    "DSCT.TA": {"name": "בנק דיסקונט", "id": "654012"},
+    "AZRG.TA": {"name": "עזריאלי", "id": "1128114"},
+    "NVTG.TA": {"name": "נובה", "id": "1081157"},
+    "ENOG.TA": {"name": "אנרג'יאן", "id": "1159044"},
+    "KEN.TA": {"name": "קנזון / קן", "id": "1148013"},
+    "DELT.TA": {"name": "דלתא גליל", "id": "1081165"},
+    "SAE.TA": {"name": "סאמיט", "id": "1098128"},
+    "STR.TA": {"name": "שטראוס", "id": "319012"},
+    "FOX.TA": {"name": "פוקס", "id": "1118016"},
+    "MTRX.TA": {"name": "מטריקס", "id": "1078012"},
+    "SPEN.TA": {"name": "שפיר אנגיניירינג", "id": "1134013"},
+    "ELAL.TA": {"name": "אל על", "id": "312017"},
+    "RTLR.TA": {"name": "רציו אנרגיות", "id": "245016"},
+    "ARGO.TA": {"name": "ארקו החזקות", "id": "1124014"},
+    "HLAN.TA": {"name": "היילנד", "id": "1141018"},
+    "ONE.TA": {"name": "וואן טכנולוגיות", "id": "1092014"},
+    "FORTY.TA": {"name": "פורמולה מערכות", "id": "1081173"},
+    "DIMO.TA": {"name": "דימול", "id": "1151017"},
+    "SCL.TA": {"name": "סלקום", "id": "270016"}
+}
+
 @st.cache_data(ttl=86400)
 def get_all_us_tickers():
     try:
@@ -38,15 +72,8 @@ def get_all_us_tickers():
 
 @st.cache_data(ttl=86400)
 def get_all_israel_tickers():
-    il_tickers = [
-        "TEVA.TA", "LUMI.TA", "POLI.TA", "DLEKG.TA", "BEZQ.TA", "ORL.TA", "NICE.TA", "ICL.TA", 
-        "HARL.TA", "MZTF.TA", "ESLT.TA", "LBRT.TA", "FIBI.TA", "DSCT.TA", "AZRG.TA", "NVTG.TA",
-        "ENOG.TA", "KEN.TA", "DELT.TA", "SAE.TA", "STR.TA", "FOX.TA", "MTRX.TA", "SPEN.TA",
-        "ELAL.TA", "RTLR.TA", "ARGO.TA", "HLAN.TA", "ONE.TA", "FORTY.TA", "DIMO.TA", "SCL.TA"
-    ]
-    return sorted(list(set(il_tickers)))
+    return sorted(list(set(ISRAEL_STOCKS_INFO.keys())))
 
-# מסך התחברות
 def check_password():
     if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
@@ -140,10 +167,17 @@ def analyze_single_ticker(ticker):
             prefix = "₪"
             if raw_price > 50:
                 df[['Open', 'High', 'Low', 'Close']] /= 100.0
+            
+            # שליפת שם בעברית ומספר נייר ערך
+            stock_info = ISRAEL_STOCKS_INFO.get(ticker, {"name": ticker, "id": "לא ידוע"})
+            display_name = stock_info["name"]
+            stock_id = stock_info["id"]
         else:
             display_price = f"${raw_price:.2f}"
             calc_price = raw_price
             prefix = "$"
+            display_name = ticker
+            stock_id = ticker
 
         df['MA50'] = df['Close'].rolling(50).mean()
         df['MA200'] = df['Close'].rolling(200).mean()
@@ -178,6 +212,8 @@ def analyze_single_ticker(ticker):
 
         return {
             "מניה": ticker,
+            "שם תצוגה": display_name,
+            "מספר נייר": stock_id,
             "כדאיות": rec_title,
             "ציון": score_10,
             "עסקת זהב": is_golden,
@@ -213,7 +249,6 @@ def plot_interactive_chart(df, ticker, prefix):
     )
     return fig
 
-# הרצת המערכת
 if check_password():
     st.title("📈 Stock Scanner Pro - Top 10")
     
@@ -251,7 +286,6 @@ if check_password():
         df_all = pd.DataFrame(all_results)
 
         if not df_all.empty:
-            # יצירת לשוניות נפרדות לארץ ולארה"ב
             tab_il, tab_us = st.tabs(["🇮🇱 מניות ישראל (Top 10)", "🇺🇸 מניות ארה\"ב (Top 10)"])
 
             with tab_il:
@@ -261,13 +295,14 @@ if check_password():
                 ).head(10).reset_index(drop=True)
 
                 if df_il.empty:
-                # Fallback if no IL stocks found
                     st.info("אין מספיק נתונים כרגע למניות ישראל.")
                 else:
                     for idx, row in df_il.iterrows():
                         badge = "🏆" if row['עסקת זהב'] else "📌"
-                        # כותרת נקייה: מספר סידורי ושם המניה בלבד
-                        with st.expander(f"{badge} #{idx+1} | סימבול: {row['מניה']}"):
+                        # מציג את השם בעברית, מספר נייר הערך, והסימבול
+                        title_text = f"{badge} #{idx+1} | {row['שם תצוגה']} (מס' נייר: {row['מספר נייר']} | סימבול: {row['מניה']})"
+                        
+                        with st.expander(title_text):
                             c1, c2 = st.columns([1, 1.5])
                             with c1:
                                 st.markdown(f"**מחיר עדכני:** {row['מחיר עדכני']}")
@@ -295,8 +330,9 @@ if check_password():
                 else:
                     for idx, row in df_us.iterrows():
                         badge = "🏆" if row['עסקת זהב'] else "📌"
-                        # כותרת נקייה: מספר סידורי ושם המניה בלבד
-                        with st.expander(f"{badge} #{idx+1} | סימבול: {row['מניה']}"):
+                        title_text = f"{badge} #{idx+1} | סימבול: {row['מניה']}"
+
+                        with st.expander(title_text):
                             c1, c2 = st.columns([1, 1.5])
                             with c1:
                                 st.markdown(f"**מחיר עדכני:** {row['מחיר עדכני']}")
