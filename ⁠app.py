@@ -27,19 +27,22 @@ if check_password():
 
     # רשימה משולבת: ארה"ב + מניות מובילות מתל אביב (.TA)
     DEFAULT_TICKERS = [
-        "AAPL", "NVDA", "TSLA", "AMZN", "GOOGL", "MSFT", "AMD",
+        "AAPL", "NVDA", "TSLA", "AMZN", "GOOGL", "MSFT", "AMD", "META",
         "TEVA.TA", "LUMI.TA", "POLI.TA", "DLEKG.TA", "BEZQ.TA", "ORL.TA", "NICE.TA"
     ]
 
-    if st.button("🚀 הרץ סריקה מתקדמת"):
-        with st.spinner("סורק ומדרג מניות..."):
-            results = []
-            histories = {}
+    # הרצת הסריקה באופן אוטומטי בעת טעינת העמוד
+    with st.spinner("סורק ומדרג מניות בלייב..."):
+        results = []
+        histories = {}
+
+        try:
+            # משיכת נתונים מרוכזת ומהירה לכל המניות יחד
+            data = yf.download(DEFAULT_TICKERS, period="3mo", group_by="ticker", progress=False)
 
             for ticker in DEFAULT_TICKERS:
                 try:
-                    t = yf.Ticker(ticker)
-                    df = t.history(period="3mo")
+                    df = data[ticker].dropna() if len(DEFAULT_TICKERS) > 1 else data.dropna()
                     if len(df) > 20:
                         close_prices = df['Close']
                         current_price = float(close_prices.iloc[-1])
@@ -75,28 +78,30 @@ if check_password():
                         histories[ticker] = close_prices
                 except Exception:
                     continue
+        except Exception:
+            st.error("אירעה שגיאה בטעינת הנתונים מ-Yahoo Finance.")
 
-            if results:
-                res_df = pd.DataFrame(results)
-                res_df = res_df.sort_values(by="פוטנציאל רווח (%)", ascending=False).head(5)
+        if results:
+            res_df = pd.DataFrame(results)
+            res_df = res_df.sort_values(by="פוטנציאל רווח (%)", ascending=False).head(5)
 
-                st.success("🎯 5 ההזדמנויות המובילות שנמצאו:")
-                st.dataframe(res_df, use_container_width=True)
+            st.success("🎯 5 ההזדמנויות המובילות שנמצאו נכון לרגע זה:")
+            st.dataframe(res_df, use_container_width=True)
 
-                st.markdown("---")
-                st.subheader("📊 פירוט וגרפים לכל מניה")
-                for index, row in res_df.iterrows():
-                    ticker_name = row['מניה']
-                    with st.expander(f"📌 {ticker_name} - פוטנציאל רווח: {row['פוטנציאל רווח (%)']}%"):
-                        col1, col2 = st.columns([1, 2])
-                        with col1:
-                            st.write(f"**מחיר נוכחי:** {row['מחיר']}")
-                            st.write(f"**מדד RSI:** {row['RSI']}")
-                            st.write(f"**יעד רווח:** {row['מחיר יעד']}")
-                            st.write(f"**קץ סיכון (Stop Loss):** {row['סטופ לוס']}")
-                            st.write(f"**יחס סיכוי/סיכון:** {row['יחס סיכוי/סיכון']}")
-                        with col2:
-                            st.caption("גרף מחירים - 3 חודשים אחרונים")
-                            st.line_chart(histories[ticker_name])
-            else:
-                st.error("לא ניתן היה להוציא נתונים כעת, נסה שוב בעוד דקה.")
+            st.markdown("---")
+            st.subheader("📊 פירוט וגרפים לכל מניה")
+            for index, row in res_df.iterrows():
+                ticker_name = row['מניה']
+                with st.expander(f"📌 {ticker_name} - פוטנציאל רווח: {row['פוטנציאל רווח (%)']}%"):
+                    col1, col2 = st.columns([1, 2])
+                    with col1:
+                        st.write(f"**מחיר נוכחי:** {row['מחיר']}")
+                        st.write(f"**מדד RSI:** {row['RSI']}")
+                        st.write(f"**יעד רווח:** {row['מחיר יעד']}")
+                        st.write(f"**קץ סיכון (Stop Loss):** {row['סטופ לוס']}")
+                        st.write(f"**יחס סיכוי/סיכון:** {row['יחס סיכוי/סיכון']}")
+                    with col2:
+                        st.caption("גרף מחירים - 3 חודשים אחרונים")
+                        st.line_chart(histories[ticker_name])
+        else:
+            st.error("לא ניתן היה להוציא נתונים כעת, נסה לרענן את העמוד.")
