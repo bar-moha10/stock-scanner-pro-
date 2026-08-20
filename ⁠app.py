@@ -133,30 +133,25 @@ def detect_candlestick_pattern(df):
         )
 
 def evaluate_trade_recommendation(pattern_type, rsi, ratio):
-    """משקלל את כל הנתונים וקובע האם כדאי להיכנס לעסקה"""
     score = 0
 
-    # ניקוד נרות
     if pattern_type == "bullish":
         score += 3
     elif pattern_type == "bearish":
         score -= 3
 
-    # ניקוד RSI
     if rsi < 35:
-        score += 2  # מכירות יתר - הזדמנות קנייה
+        score += 2
     elif 35 <= rsi <= 65:
-        score += 1  # מומנטום בריא
+        score += 1
     elif rsi > 70:
-        score -= 2  # קניית יתר - סיכון לתיקון
+        score -= 2
 
-    # ניקוד יחס סיכוי/סיכון
     if ratio >= 2.0:
         score += 2
     elif ratio < 1.2:
         score -= 2
 
-    # קביעת ההמלצה
     if score >= 4:
         return "✅ שווה כניסה (איתות שורי חזק)", "המניה מציגה שילוב מצוין של תבנית נרות, מומנטום חיובי ויחס סיכוי/סיכון משתלם."
     elif score >= 1:
@@ -386,18 +381,20 @@ if check_password():
         st.subheader("🇮🇱 Top 5 הזדמנויות - הבורסה בתל אביב")
         df_il = pd.DataFrame()
         if results_israel:
-            display_cols = ["מניה", "כדאיות", "מחיר עדכני", "תבנית נר", "RSI", "מחיר יעד", "סטופ לוס", "פוטנציאל רווח (%)"]
-            df_il = pd.DataFrame(results_israel).sort_values(by="פוטנציאל רווח (%)", ascending=False).head(5)
-            st.dataframe(df_il[display_cols], use_container_width=True)
+            df_il = pd.DataFrame(results_israel).sort_values(by="פוטנציאל רווח (%)", ascending=False).head(5).reset_index(drop=True)
+            df_il["מקום"] = [f"#{i+1}" for i in range(len(df_il))]
+            display_cols = ["מקום", "מניה", "כדאיות", "מחיר עדכני", "תבנית נר", "RSI", "מחיר יעד", "סטופ לוס", "פוטנציאל רווח (%)"]
+            st.dataframe(df_il[display_cols], use_container_width=True, hide_index=True)
 
         st.markdown("---")
 
         st.subheader("🇺🇸 Top 5 הזדמנויות - בורסת ארה\"ב")
         df_us = pd.DataFrame()
         if results_usa:
-            display_cols = ["מניה", "כדאיות", "מחיר עדכני", "תבנית נר", "RSI", "מחיר יעד", "סטופ לוס", "פוטנציאל רווח (%)"]
-            df_us = pd.DataFrame(results_usa).sort_values(by="פוטנציאל רווח (%)", ascending=False).head(5)
-            st.dataframe(df_us[display_cols], use_container_width=True)
+            df_us = pd.DataFrame(results_usa).sort_values(by="פוטנציאל רווח (%)", ascending=False).head(5).reset_index(drop=True)
+            df_us["מקום"] = [f"#{i+1}" for i in range(len(df_us))]
+            display_cols = ["מקום", "מניה", "כדאיות", "מחיר עדכני", "תבנית נר", "RSI", "מחיר יעד", "סטופ לוס", "פוטנציאל רווח (%)"]
+            st.dataframe(df_us[display_cols], use_container_width=True, hide_index=True)
 
         st.markdown("---")
 
@@ -407,7 +404,8 @@ if check_password():
         if not all_top.empty:
             for index, row in all_top.iterrows():
                 ticker_name = row['מניה']
-                with st.expander(f"📌 {ticker_name} - {row['כדאיות']} | פוטנציאל: {row['פוטנציאל רווח (%)']}%"):
+                rank_str = row['מקום']
+                with st.expander(f"📌 {rank_str} {ticker_name} - {row['כדאיות']} | פוטנציאל: {row['פוטנציאל רווח (%)']}%"):
                     col1, col2 = st.columns([1, 2])
                     with col1:
                         st.markdown(f"**מחיר עדכני:** {row['מחיר עדכני']}")
