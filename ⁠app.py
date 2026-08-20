@@ -153,11 +153,11 @@ def evaluate_trade_recommendation(pattern_type, rsi, ratio):
         score -= 2
 
     if score >= 4:
-        return "✅ שווה כניסה (איתות שורי חזק)", "המניה מציגה שילוב מצוין של תבנית נרות, מומנטום חיובי ויחס סיכוי/סיכון משתלם."
+        return "✅ שווה כניסה (איתות שורי חזק)", 3, "המניה מציגה שילוב מצוין של תבנית נרות, מומנטום חיובי ויחס סיכוי/סיכון משתלם."
     elif score >= 1:
-        return "🟡 להמתין / כניסה בזהירות", "יש סימנים חיוביים, אך מומלץ להמתין לאישור נוסף או להגדיר סטופ לוס הדוק."
+        return "🟡 להמתין / כניסה בזהירות", 2, "יש סימנים חיוביים, אך מומלץ להמתין לאישור נוסף או להגדיר סטופ לוס הדוק."
     else:
-        return "❌ לא מומלץ כרגע", "הנתונים מעידים על לחץ מוכרים, RSI גבוה או יחס סיכוי/סיכון לא אטרקטיבי."
+        return "❌ לא מומלץ כרגע", 1, "הנתונים מעידים על לחץ מוכרים, RSI גבוה או יחס סיכוי/סיכון לא אטרקטיבי."
 
 def analyze_ticker(user_input, period="6mo"):
     clean_input = user_input.split("-")[0].split("/")[0].strip().replace('"', '').replace("'", "")
@@ -212,7 +212,7 @@ def analyze_ticker(user_input, period="6mo"):
     risk_pct = round(((calc_price - stop_loss) / calc_price) * 100, 2)
     ratio = round(potential_gain_pct / risk_pct, 2) if risk_pct > 0 else 0
 
-    rec_title, rec_desc = evaluate_trade_recommendation(pattern_type, rsi, ratio)
+    rec_title, rec_rank, rec_desc = evaluate_trade_recommendation(pattern_type, rsi, ratio)
 
     analysis = {
         "מניה": ticker,
@@ -221,6 +221,7 @@ def analyze_ticker(user_input, period="6mo"):
         "תבנית נר": candle_pattern,
         "הסבר נר": candle_desc,
         "המלצה": rec_title,
+        "דירוג המלצה": rec_rank,
         "הסבר המלצה": rec_desc,
         "סטופ לוס": f"{prefix}{stop_loss}",
         "מחיר יעד": f"{prefix}{target}",
@@ -361,6 +362,7 @@ if check_password():
                 item = {
                     "מניה": res["מניה"],
                     "כדאיות": res["המלצה"],
+                    "דירוג המלצה": res["דירוג המלצה"],
                     "מחיר עדכני": res["מחיר עדכני"],
                     "תבנית נר": res["תבנית נר"],
                     "הסבר נר": res["הסבר נר"],
@@ -381,7 +383,8 @@ if check_password():
         st.subheader("🇮🇱 Top 5 הזדמנויות - הבורסה בתל אביב")
         df_il = pd.DataFrame()
         if results_israel:
-            df_il = pd.DataFrame(results_israel).sort_values(by="פוטנציאל רווח (%)", ascending=False).head(5).reset_index(drop=True)
+            # מיון כפול: קודם לפי דירוג הכדאיות (מהגבוה לנמוך) ואז לפי פוטנציאל הרווח
+            df_il = pd.DataFrame(results_israel).sort_values(by=["דירוג המלצה", "פוטנציאל רווח (%)"], ascending=[False, False]).head(5).reset_index(drop=True)
             df_il["מקום"] = [f"#{i+1}" for i in range(len(df_il))]
             display_cols = ["מקום", "מניה", "כדאיות", "מחיר עדכני", "תבנית נר", "RSI", "מחיר יעד", "סטופ לוס", "פוטנציאל רווח (%)"]
             st.dataframe(df_il[display_cols], use_container_width=True, hide_index=True)
@@ -391,7 +394,8 @@ if check_password():
         st.subheader("🇺🇸 Top 5 הזדמנויות - בורסת ארה\"ב")
         df_us = pd.DataFrame()
         if results_usa:
-            df_us = pd.DataFrame(results_usa).sort_values(by="פוטנציאל רווח (%)", ascending=False).head(5).reset_index(drop=True)
+            # מיון כפול: קודם לפי דירוג הכדאיות (מהגבוה לנמוך) ואז לפי פוטנציאל הרווח
+            df_us = pd.DataFrame(results_usa).sort_values(by=["דירוג המלצה", "פוטנציאל רווח (%)"], ascending=[False, False]).head(5).reset_index(drop=True)
             df_us["מקום"] = [f"#{i+1}" for i in range(len(df_us))]
             display_cols = ["מקום", "מניה", "כדאיות", "מחיר עדכני", "תבנית נר", "RSI", "מחיר יעד", "סטופ לוס", "פוטנציאל רווח (%)"]
             st.dataframe(df_us[display_cols], use_container_width=True, hide_index=True)
