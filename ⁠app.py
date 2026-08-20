@@ -201,8 +201,7 @@ if check_password():
         searched_ticker = st.selectbox(
             "הקלד שם מניה או סימול (למשל: ב...):",
             options=SEARCH_OPTIONS,
-            index=0,
-            help="התחל להקליד אות לקבלת הצעות חיפוש"
+            index=0
         )
     
     with col_search2:
@@ -219,12 +218,12 @@ if check_password():
                 st.success(f"תוצאות ניתוח עבור {res['מניה']}:")
                 c1, c2 = st.columns([1, 2])
                 with c1:
-                    st.metric("מחיר עדכני", res['מחיר עדכני'], help="מחיר בזמן אמת מהבורסה (שקלים/אגורות למניות ישראליות).")
-                    st.markdown(f"**מדד RSI:** {res['RSI']}", help="מדד עוצמה (1-100). מתחת ל-30 זה מכירת יתר/מציאה, מעל 70 קניית יתר, ובאזור 50-60 מומנטום חיובי.")
-                    st.markdown(f"**מחיר יעד (Take Profit):** {res['מחיר יעד']}", help="מחיר יציאה מומלץ למכירה ולקיחת רווחים.")
-                    st.markdown(f"**קץ סיכון (Stop Loss):** {res['סטופ לוס']}", help="מחיר הגנה/חיתוך הפסד למניעת הפסדים נוספים.")
-                    st.markdown(f"**פוטנציאל רווח:** {res['פוטנציאל רווח (%)']}%", help="אחוז הרווח המשוער מהמחיר הנוכחי ועד למחיר היעד.")
-                    st.markdown(f"**יחס סיכוי/סיכון:** {res['יחס סיכוי/סיכון']}", help="יחס הרווח מול הסיכון. 2.0 ומעלה נחשב יחס מצוין (מרוויחים פי 2 ממה שמסכנים).")
+                    st.metric("מחיר עדכני", res['מחיר עדכני'])
+                    st.markdown(f"**מדד RSI:** {res['RSI']}")
+                    st.markdown(f"**מחיר יעד (Take Profit):** {res['מחיר יעד']}")
+                    st.markdown(f"**קץ סיכון (Stop Loss):** {res['סטופ לוס']}")
+                    st.markdown(f"**פוטנציאל רווח:** {res['פוטנציאל רווח (%)']}%")
+                    st.markdown(f"**יחס סיכוי/סיכון:** {res['יחס סיכוי/סיכון']}")
                 with c2:
                     st.caption("גרף אינטראקטיבי (העבר אצבע לזיהוי מחיר ותאריך)")
                     fig = plot_interactive_chart(res['df'], res['מניה'], res['prefix'])
@@ -289,10 +288,27 @@ if check_password():
                     col1, col2 = st.columns([1, 2])
                     with col1:
                         st.markdown(f"**מחיר עדכני:** {row['מחיר עדכני']}")
-                        st.markdown(f"**מדד RSI:** {row['RSI']}", help="מדד עוצמה יחסית (1-100). מראה את מומנטום הקונים מול המוכרים.")
-                        st.markdown(f"**יעד רווח:** {row['מחיר יעד']}", help="מחיר יציאה מומלץ למימוש רווחים בעסקה.")
-                        st.markdown(f"**קץ סיכון (Stop Loss):** {row['סטופ לוס']}", help="מחיר הגנה קריטי לחיתוך הפסד בזמן.")
-                        st.markdown(f"**יחס סיכוי/סיכון:** {row['יחס סיכוי/סיכון']}", help="יחס הרווח מול הסיכון. 2.0 ומעלה נחשב יחס מצוין לעסקה.")
+                        
+                        c_rsi, c_rsi_info = st.columns([4, 1])
+                        c_rsi.markdown(f"**מדד RSI:** {row['RSI']}")
+                        with c_rsi_info.popover("ℹ️"):
+                            st.write("מדד עוצמה יחסית (1-100). מראה את מומנטום הקונים מול המוכרים.")
+
+                        c_tp, c_tp_info = st.columns([4, 1])
+                        c_tp.markdown(f"**יעד רווח:** {row['מחיר יעד']}")
+                        with c_tp_info.popover("ℹ️"):
+                            st.write("מחיר יציאה מומלץ למימוש רווחים בעסקה.")
+
+                        c_sl, c_sl_info = st.columns([4, 1])
+                        c_sl.markdown(f"**קץ סיכון:** {row['סטופ לוס']}")
+                        with c_sl_info.popover("ℹ️"):
+                            st.write("מחיר הגנה קריטי (Stop Loss) לחיתוך הפסד בזמן.")
+
+                        c_rr, c_rr_info = st.columns([4, 1])
+                        c_rr.markdown(f"**יחס סיכוי/סיכון:** {row['יחס סיכוי/סיכון']}")
+                        with c_rr_info.popover("ℹ️"):
+                            st.write("יחס הרווח מול הסיכון. 2.0 ומעלה נחשב יחס מצוין לעסקה (מרוויחים פי 2 ממה שמסכנים).")
+
                     with col2:
                         fig = plot_interactive_chart(histories_df[ticker_name], ticker_name, prefixes[ticker_name])
                         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
