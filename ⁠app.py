@@ -23,7 +23,7 @@ def check_password():
     return True
 
 def get_live_price(ticker):
-    """שליפת מחיר אמת ישירות מ-Yahoo Query API למעקף באגים של התאמות"""
+    """שליפת מחיר אמת ישירות מ-Yahoo Query API"""
     try:
         url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
         headers = {'User-Agent': 'Mozilla/5.0'}
@@ -44,7 +44,7 @@ if check_password():
 
     ALL_TICKERS = ISRAEL_TICKERS + USA_TICKERS
 
-    with st.spinner("מביא מחירי אמת עדכניים מבורסות תל אביב וארה\"ב..."):
+    with st.spinner("מביא מחירי אמת עדכניים ומבצע ניתוח טכני..."):
         results_israel = []
         results_usa = []
         histories = {}
@@ -53,57 +53,64 @@ if check_password():
             try:
                 is_israeli = ticker.endswith(".TA")
                 
-                # 1. שליפת מחיר אמת נוכחי בלייב עוקף התאמות
-                live_price = get_live_price(ticker)
+                # 1. שליפת מחיר בלייב
+                raw_live_price = get_live_price(ticker)
                 
-                # 2. שליפת היסטוריה לצורך חישובי RSI ו-ATR
+                # 2. שליפת היסטוריה
                 t = yf.Ticker(ticker)
                 df = t.history(period="3mo", auto_adjust=False)
 
-                if live_price is None and not df.empty:
-                    live_price = float(df['Close'].iloc[-1])
+                if raw_live_price is None and not df.empty:
+                    raw_live_price = float(df['Close'].iloc[-1])
 
-                if live_price and not df.empty:
+                if raw_live_price and not df.empty:
                     if is_israeli:
-                        # בורסת ת"א מדווחת באגורות ב-Yahoo (למשל 8615)
-                        if live_price > 1000:
-                            price_agorot = live_price
-                            price_ils = live_price / 100.0
-                        elif live_price > 100:
-                            price_ils = live_price
-                            price_agorot = live_price * 100.0
+                        # המרה אחידה לשקלים בלבד
+                        if raw_live_price > 1000:
+                            price_ils = raw_live_price / 100.0
+                            price_agorot = raw_live_price
+                        elif raw_live_price > 100:
+                            price_ils = raw_live_price
+                            price_agorot = raw_live_price * 100.0
                         else:
-                            price_ils = live_price / 100.0
-                            price_agorot = live_price
+                            price_ils = raw_live_price / 100.0
+                            price_agorot = raw_live_price
 
                         display_price = f"₪{price_ils:.2f} ({int(price_agorot):,} אג')"
                         calc_price = price_ils
                         prefix = "₪"
 
-                        scale = 100.0 if df['Close'].iloc[-1] > 100 else 1.0
-                        history_series = df['Close'] / scale
-                        high_series = df['High'] / scale
-                        low_series = df['Low'] / scale
+                        # זיהוי ונורמול של סדרות הנתונים לשקלים
+                        hist_last = df['Close'].iloc[-1]
+                        divider = 100.0 if hist_last > 100 else 1.0
+
+                        history_series = df['Close'] / divider
+                        high_series = df['High'] / divider
+                        low_series = df['Low'] / divider
                     else:
-                        display_price = f"${live_price:.2f}"
-                        calc_price = live_price
+                        display_price = f"${raw_live_price:.2f}"
+                        calc_price = raw_live_price
                         prefix = "$"
 
                         history_series = df['Close']
                         high_series = df['High']
                         low_series = df['Low']
 
-                    # חישוב RSI
+                    # 3. חישוב RSI
                     delta = history_series.diff()
                     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
                     rs = gain / loss
                     rsi = float((100 - (100 / (1 + rs))).iloc[-1]) if not loss.empty and loss.iloc[-1] != 0 else 50.0
 
-                    # חישוב ATR
+                    # 4. חישוב ATR
                     high_low = high_series - low_series
                     atr = float(high_low.rolling(14).mean().iloc[-1]) if len(high_low) >= 14 else calc_price * 0.02
+                    
+                    if pd.isna(atr) or atr <= 0 or atr > (calc_price * 0.2):
+                        atr = calc_price * 0.02
 
+                    # 5. חישוב יעדים וסטופ לוס
                     stop_loss = round(calc_price - (1.5 * atr), 2)
                     target = round(calc_price + (3.0 * atr), 2)
 
@@ -169,5 +176,5 @@ if check_password():
                         st.write(f"**קץ סיכון (Stop Loss):** {row['סטופ לוס']}")
                         st.write(f"**יחס סיכוי/סיכון:** {row['יחס סיכוי/סיכון']}")
                     with col2:
-                        st.caption("גרף מחירים")
+                        st.caption("גרף מחירים בשקלים / דולרים")
                         st.line_chart(histories[ticker_name])
