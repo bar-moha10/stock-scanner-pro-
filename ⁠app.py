@@ -26,23 +26,17 @@ st.markdown("""
 # פונקציות להבאת רשימות המניות המלאות של כל השוק
 @st.cache_data(ttl=86400)
 def get_all_us_tickers():
-    """מושך את כל רשימת המניות הנסחרות בארה"ב (S&P500 + NASDAQ/NYSE עיקריות)"""
     try:
-        # משיכת רשימת S&P 500 מ-Wikipedia
         sp500 = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')[0]['Symbol'].tolist()
         sp500 = [t.replace('.', '-') for t in sp500]
-        
-        # מניות מומנטום וטכנולוגיה מובילות נוספות
         extra_us = ["QQQ", "IWM", "PLTR", "SOFI", "HOOD", "COIN", "U", "RBLX", "ARM", "SMCI"]
         all_us = list(set(sp500 + extra_us))
         return sorted(all_us)
     except Exception:
-        # גיבוי במידה והחיבור לויקיפדיה נכשל
         return ["AAPL", "NVDA", "TSLA", "AMZN", "GOOGL", "MSFT", "AMD", "META", "NFLX", "INTC", "PLTR", "ARM", "SMCI"]
 
 @st.cache_data(ttl=86400)
 def get_all_israel_tickers():
-    """מניות הבורסה בתל אביב (ת"א 125 + מניות בולטות נוספות)"""
     il_tickers = [
         "TEVA.TA", "LUMI.TA", "POLI.TA", "DLEKG.TA", "BEZQ.TA", "ORL.TA", "NICE.TA", "ICL.TA", 
         "HARL.TA", "MZTF.TA", "ESLT.TA", "LBRT.TA", "FIBI.TA", "DSCT.TA", "AZRG.TA", "NVTG.TA",
@@ -50,13 +44,6 @@ def get_all_israel_tickers():
         "ELAL.TA", "RTLR.TA", "ARGO.TA", "HLAN.TA", "ONE.TA", "FORTY.TA", "DIMO.TA", "SCL.TA"
     ]
     return sorted(list(set(il_tickers)))
-
-HEBREW_TICKERS = {
-    "בזן": "ORL.TA", "בתי זיקוק": "ORL.TA", "דלק": "DLEKG.TA", "קבוצת דלק": "DLEKG.TA",
-    "בזק": "BEZQ.TA", "טבע": "TEVA.TA", "לאומי": "LUMI.TA", "פועלים": "POLI.TA",
-    "נייס": "NICE.TA", "כיל": "ICL.TA", "אייסיאל": "ICL.TA", "הראל": "HARL.TA",
-    "מזרחי": "MZTF.TA", "מזרחי טפחות": "MZTF.TA", "ליברה": "LBRT.TA", "אלביט": "ESLT.TA"
-}
 
 def check_password():
     if "authenticated" not in st.session_state:
@@ -67,7 +54,7 @@ def check_password():
         username = st.text_input("שם משתמש")
         password = st.text_input("סיסמה", type="password")
         if st.button("התחבר"):
-            if username == "admin" and password == "1234":
+            if username == "shemi" and password == "yahav8122011":
                 st.session_state["authenticated"] = True
                 st.rerun()
             else:
@@ -164,7 +151,6 @@ def calculate_score_and_recommendation(pattern_type, rsi, ratio, ma50, ma200, cu
     return rec_title, final_score, rec_desc, is_golden_trade, reasons
 
 def analyze_single_ticker(ticker):
-    """ניתוח מהיר של מניה בודדת עבור הסורק ההמוני"""
     try:
         t = yf.Ticker(ticker)
         df = t.history(period="6mo", auto_adjust=False)
@@ -282,7 +268,6 @@ def plot_interactive_chart(df, ticker, prefix):
 if check_password():
     st.title("📈 Stock Scanner Pro - Full Market Scanner")
 
-    # טעינת רשימות המניות המלאות
     us_tickers = get_all_us_tickers()
     israel_tickers = get_all_israel_tickers()
 
@@ -302,7 +287,6 @@ if check_password():
 
         status_text.text("מריץ סריקה מקבילית מהירה על מאות מניות...")
 
-        # שימוש ב-Multi-threading לסריקה מהירה ביותר
         completed_count = 0
         with ThreadPoolExecutor(max_workers=20) as executor:
             future_to_ticker = {executor.submit(analyze_single_ticker, ticker): ticker for ticker in total_tickers}
@@ -321,7 +305,6 @@ if check_password():
         df_all = pd.DataFrame(all_results)
 
         if not df_all.empty:
-            # 1. תוצאות תל אביב
             st.subheader("🇮🇱 Top 5 הזדמנויות - הבורסה בתל אביב (מתוך כל השוק)")
             df_il = df_all[df_all["מניה"].str.endswith(".TA")].sort_values(
                 by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]
@@ -334,7 +317,6 @@ if check_password():
 
             st.markdown("---")
 
-            # 2. תוצאות ארה"ב
             st.subheader("🇺🇸 Top 5 הזדמנויות - בורסת ארה\"ב (מתוך כל השוק)")
             df_us = df_all[~df_all["מניה"].str.endswith(".TA")].sort_values(
                 by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]
@@ -347,7 +329,6 @@ if check_password():
 
             st.markdown("---")
 
-            # 3. גרפים ופירוט מלא של 10 המנצחות
             st.subheader("📊 פירוט וגרפים - 10 המניות החזקות ביותר בשוק")
             all_top = pd.concat([df_il, df_us], ignore_index=True)
 
