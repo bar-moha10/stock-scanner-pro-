@@ -39,14 +39,14 @@ if check_password():
                         close_prices = df['Close']
                         current_price = float(close_prices.iloc[-1])
 
-                        # חישוב RSI פשוט
+                        # חישוב RSI
                         delta = close_prices.diff()
                         gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
                         loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
                         rs = gain / loss
                         rsi = float((100 - (100 / (1 + rs))).iloc[-1])
 
-                        # חישוב תנודתיות (ATR בסיסי)
+                        # חישוב תנודתיות ATR
                         high_low = df['High'] - df['Low']
                         atr = float(high_low.rolling(14).mean().iloc[-1])
 
@@ -75,7 +75,7 @@ if check_password():
                 res_df = res_df.sort_values(by="פוטנציאל רווח (%)", ascending=False).head(5)
 
                 st.success("🎯 5 ההזדמנויות המובילות שנמצאו:")
-                st.dataframe(res_df.style.background_gradient(subset=['פוטנציאל רווח (%)'], cmap='Greens'), use_container_width=True)
+                st.dataframe(res_df, use_container_width=True)
 
                 st.markdown("---")
                 st.subheader("📊 פירוט מניות נבחרות")
