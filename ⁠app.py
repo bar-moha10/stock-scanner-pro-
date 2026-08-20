@@ -258,7 +258,6 @@ if check_password():
         st.success("מחובר כמשתמש: **shemi**")
         run_scan_sidebar = st.button("🚀 הפעל סריקת שוק מלאה (צד)", type="primary")
 
-    # כפתור ראשי גדול במרכז המסך (נוח במיוחד לניידים שבהם התפריט סגור)
     st.markdown("### 🔍 התחלת עבודה")
     run_scan_main = st.button("🚀 הפעל סריקת שוק מלאה עכשיו", type="primary", use_container_width=True)
 
@@ -303,7 +302,8 @@ if check_password():
                 else:
                     for idx, row in df_il.iterrows():
                         badge = "🏆" if row['עסקת זהב'] else "📌"
-                        title_text = f"{badge} #{idx+1} | {row['שם תצוגה']} (מס' נייר: {row['מספר נייר']} | סימבול: {row['מניה']})"
+                        # תצוגה נקייה: דירוג, שם בעברית, מספר נייר וסימבול
+                        title_text = f"{badge} #{idx+1} | {row['שם תצוגה']} ({row['מספר נייר']} / {row['מניה']})"
                         
                         with st.expander(title_text):
                             c1, c2 = st.columns([1, 1.5])
@@ -333,7 +333,8 @@ if check_password():
                 else:
                     for idx, row in df_us.iterrows():
                         badge = "🏆" if row['עסקת זהב'] else "📌"
-                        title_text = f"{badge} #{idx+1} | סימבול: {row['מניה']}"
+                        # תצוגה נקייה למניות ארה"ב: דירוג וסימבול
+                        title_text = f"{badge} #{idx+1} | {row['מניה']}"
 
                         with st.expander(title_text):
                             c1, c2 = st.columns([1, 1.5])
