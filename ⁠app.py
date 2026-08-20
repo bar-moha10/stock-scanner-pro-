@@ -69,9 +69,7 @@ def analyze_ticker(user_input, period="6mo"):
     if not raw_live_price or df.empty:
         return None, f"לא נמצאו נתונים עבור '{user_input}'."
 
-    # טיפול בנרמול מניות ישראליות (הפיכה מאגורות לשקלים)
     if is_israeli:
-        # בורסת ת"א מציגה באגורות, לכן מחלקים ב-100 כדי לקבל שקלים
         price_ils = raw_live_price / 100.0 if raw_live_price > 50 else raw_live_price
         price_agorot = price_ils * 100.0
 
@@ -79,7 +77,6 @@ def analyze_ticker(user_input, period="6mo"):
         calc_price = price_ils
         prefix = "₪"
 
-        # התאמת ההיסטוריה לשקלים
         history_df = df[['Close', 'High', 'Low']].copy()
         if history_df['Close'].iloc[-1] > 50:
             history_df = history_df / 100.0
@@ -89,14 +86,14 @@ def analyze_ticker(user_input, period="6mo"):
         prefix = "$"
         history_df = df[['Close', 'High', 'Low']].copy()
 
-    # חישוב RSI
+    # RSI
     delta = history_df['Close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
     rs = gain / loss
     rsi = float((100 - (100 / (1 + rs))).iloc[-1]) if not loss.empty and loss.iloc[-1] != 0 else 50.0
 
-    # חישוב ATR
+    # ATR
     high_low = history_df['High'] - history_df['Low']
     atr = float(high_low.rolling(14).mean().iloc[-1]) if len(high_low) >= 14 else calc_price * 0.02
 
@@ -132,23 +129,23 @@ def plot_interactive_chart(df, ticker, prefix):
         y=df['Close'], 
         mode='lines', 
         name='מחיר',
-        line=dict(color='#0066cc', width=2),
+        line=dict(color='#0066cc', width=2.5),
         hovertemplate='%{x|%d/%m/%Y}<br>מחיר: ' + prefix + '%{y:.2f}<extra></extra>'
     ))
     
     fig.update_layout(
-        hovermode="x unified",
-        margin=dict(l=10, r=10, t=30, b=10),
-        height=320,
-        xaxis=dict(showgrid=True, zeroline=False),
-        yaxis=dict(showgrid=True, zeroline=False, title=f"מחיר ב-{prefix}")
+        hovermode="x",
+        margin=dict(l=5, r=5, t=10, b=10),
+        height=300,
+        dragmode=False,
+        xaxis=dict(showgrid=True, zeroline=False, fixedrange=True),
+        yaxis=dict(showgrid=True, zeroline=False, fixedrange=True)
     )
     return fig
 
 if check_password():
     st.title("📈 Stock Scanner Pro")
     
-    # ⏱️ הגדרות סרגל צד לטווח זמן
     st.sidebar.header("⚙️ הגדרות תצוגה")
     selected_period = st.sidebar.select_slider(
         "טווח זמן לגרפים:",
@@ -157,7 +154,6 @@ if check_password():
         format_func=lambda x: {"1mo": "חודש", "3mo": "3 חודשים", "6mo": "חצי שנה", "1y": "שנה"}[x]
     )
 
-    # 🔍 אזור חיפוש
     st.subheader("🔍 חיפוש וניתוח מניה ספציפית")
     col_search1, col_search2 = st.columns([3, 1])
     
@@ -185,13 +181,12 @@ if check_password():
                     st.write(f"**פוטנציאל רווח:** {res['פוטנציאל רווח (%)']}%")
                     st.write(f"**יחס סיכוי/סיכון:** {res['יחס סיכוי/סיכון']}")
                 with c2:
-                    st.caption("גרף אינטראקטיבי (העבר עכבר/אצבע לזיהוי מחירים ותאריכים)")
+                    st.caption("גרף אינטראקטיבי (העבר אצבע לזיהוי מחיר ותאריך)")
                     fig = plot_interactive_chart(res['df'], res['מניה'], res['prefix'])
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
     st.markdown("---")
 
-    # 🇮🇱🇺🇸 סריקה כללית (Top 5)
     ISRAEL_TICKERS = ["TEVA.TA", "LUMI.TA", "POLI.TA", "DLEKG.TA", "BEZQ.TA", "ORL.TA", "NICE.TA", "ICL.TA", "HARL.TA", "MZTF.TA"]
     USA_TICKERS = ["AAPL", "NVDA", "TSLA", "AMZN", "GOOGL", "MSFT", "AMD", "META", "NFLX", "INTC"]
     ALL_TICKERS = ISRAEL_TICKERS + USA_TICKERS
@@ -223,7 +218,6 @@ if check_password():
                 histories_df[ticker] = res["df"]
                 prefixes[ticker] = res["prefix"]
 
-        # 🇮🇱 Top 5 ישראל
         st.subheader("🇮🇱 Top 5 הזדמנויות - הבורסה בתל אביב")
         df_il = pd.DataFrame()
         if results_israel:
@@ -232,7 +226,6 @@ if check_password():
 
         st.markdown("---")
 
-        # 🇺🇸 Top 5 ארה"ב
         st.subheader("🇺🇸 Top 5 הזדמנויות - בורסת ארה\"ב")
         df_us = pd.DataFrame()
         if results_usa:
@@ -241,7 +234,6 @@ if check_password():
 
         st.markdown("---")
 
-        # פירוט וגרפים ל-Top 10
         st.subheader("📊 פירוט וגרפים - 10 המניות הנבחרות")
         all_top = pd.concat([df_il, df_us], ignore_index=True)
 
@@ -258,4 +250,4 @@ if check_password():
                         st.write(f"**יחס סיכוי/סיכון:** {row['יחס סיכוי/סיכון']}")
                     with col2:
                         fig = plot_interactive_chart(histories_df[ticker_name], ticker_name, prefixes[ticker_name])
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
