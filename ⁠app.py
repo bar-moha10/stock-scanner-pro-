@@ -69,30 +69,25 @@ def analyze_ticker(user_input, period="6mo"):
     if not raw_live_price or df.empty:
         return None, f"לא נמצאו נתונים עבור '{user_input}'."
 
+    # טיפול בנרמול מניות ישראליות (הפיכה מאגורות לשקלים)
     if is_israeli:
-        if raw_live_price > 1000:
-            price_ils = raw_live_price / 100.0
-            price_agorot = raw_live_price
-        elif raw_live_price > 100:
-            price_ils = raw_live_price
-            price_agorot = raw_live_price * 100.0
-        else:
-            price_ils = raw_live_price / 100.0
-            price_agorot = raw_live_price
+        # בורסת ת"א מציגה באגורות, לכן מחלקים ב-100 כדי לקבל שקלים
+        price_ils = raw_live_price / 100.0 if raw_live_price > 50 else raw_live_price
+        price_agorot = price_ils * 100.0
 
         display_price = f"₪{price_ils:.2f} ({int(price_agorot):,} אג')"
         calc_price = price_ils
         prefix = "₪"
 
-        hist_last = df['Close'].iloc[-1]
-        divider = 100.0 if hist_last > 100 else 1.0
-
-        history_df = df[['Close', 'High', 'Low']] / divider
+        # התאמת ההיסטוריה לשקלים
+        history_df = df[['Close', 'High', 'Low']].copy()
+        if history_df['Close'].iloc[-1] > 50:
+            history_df = history_df / 100.0
     else:
         display_price = f"${raw_live_price:.2f}"
         calc_price = raw_live_price
         prefix = "$"
-        history_df = df[['Close', 'High', 'Low']]
+        history_df = df[['Close', 'High', 'Low']].copy()
 
     # חישוב RSI
     delta = history_df['Close'].diff()
@@ -153,7 +148,7 @@ def plot_interactive_chart(df, ticker, prefix):
 if check_password():
     st.title("📈 Stock Scanner Pro")
     
-    # ⏱️ בחירת טווח זמן לגרפים
+    # ⏱️ הגדרות סרגל צד לטווח זמן
     st.sidebar.header("⚙️ הגדרות תצוגה")
     selected_period = st.sidebar.select_slider(
         "טווח זמן לגרפים:",
@@ -190,7 +185,7 @@ if check_password():
                     st.write(f"**פוטנציאל רווח:** {res['פוטנציאל רווח (%)']}%")
                     st.write(f"**יחס סיכוי/סיכון:** {res['יחס סיכוי/סיכון']}")
                 with c2:
-                    st.caption("גרף אינטראקטיבי (העבר עכבר לזיהוי מחירים ותאריכים)")
+                    st.caption("גרף אינטראקטיבי (העבר עכבר/אצבע לזיהוי מחירים ותאריכים)")
                     fig = plot_interactive_chart(res['df'], res['מניה'], res['prefix'])
                     st.plotly_chart(fig, use_container_width=True)
 
