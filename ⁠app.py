@@ -135,9 +135,9 @@ def analyze_stock(ticker, info, market_type):
         candlestick_analysis = detect_candlestick_patterns(df)
         is_gold = fixed_score >= 8
 
-        disp_price = f"<span dir='ltr'>{prefix}{calc_price:,.2f}</span>"
-        targ_price = f"<span dir='ltr'>{prefix}{calc_price * 1.15:,.2f}</span>"
-        stop_price = f"<span dir='ltr'>{prefix}{calc_price * 0.94:,.2f}</span>"
+        disp_price = f"{prefix}{calc_price:,.2f}"
+        targ_price = f"{prefix}{calc_price * 1.15:,.2f}"
+        stop_price = f"{prefix}{calc_price * 0.94:,.2f}"
 
         return {
             "ticker": ticker, "name": name, "stock_id": security_id, "price": calc_price,
@@ -152,9 +152,9 @@ def analyze_stock(ticker, info, market_type):
         simulated_prices = [base * (1 + (i - 50) * 0.002) for i in range(100)]
         df_dummy = pd.DataFrame({'Open': simulated_prices, 'High': [p*1.01 for p in simulated_prices], 'Low': [p*0.99 for p in simulated_prices], 'Close': simulated_prices, 'MA50': simulated_prices, 'MA200': simulated_prices}, index=dates)
         
-        disp_price = f"<span dir='ltr'>{prefix}{base:,.2f}</span>"
-        targ_price = f"<span dir='ltr'>{prefix}{base*1.15:,.2f}</span>"
-        stop_price = f"<span dir='ltr'>{prefix}{base*0.94:,.2f}</span>"
+        disp_price = f"{prefix}{base:,.2f}"
+        targ_price = f"{prefix}{base*1.15:,.2f}"
+        stop_price = f"{prefix}{base*0.94:,.2f}"
 
         return {
             "ticker": ticker, "name": name, "stock_id": security_id, "price": base, "display_price": disp_price,
@@ -197,15 +197,13 @@ def plot_candlestick_chart(df, ticker_name):
 def render_stock_expander(row, is_tase=False, rank_prefix=""):
     medal_icon = "🟢" if row['is_gold'] else "🟡"
     ticker_display = f"מס' נייר: {row['stock_id']}" if is_tase else f"{row['ticker']}"
-    title_text = f"{rank_prefix} {row['name']} ({ticker_display})" if rank_prefix else f"{row['name']} ({ticker_display})"
+    title_text = f"{medal_icon} {rank_prefix} | {row['name']} ({ticker_display}) | מחיר: {row['display_price']} | ציון: {row['score']}/10"
     
-    title_html = f"{medal_icon} {title_text} &nbsp;|&nbsp; מחיר: {row['display_price']} &nbsp;|&nbsp; ציון: {row['score']}/10"
-    
-    with st.expander(title_html):
+    with st.expander(title_text):
         c1, c2 = st.columns([1, 1.6])
         with c1:
-            st.markdown(f"**🎯 יעד רווח מומלץ:** {row['target']}", unsafe_allow_html=True)
-            st.markdown(f"**🛡️ סטופ לוס מגן:** {row['stop_loss']}", unsafe_allow_html=True)
+            st.markdown(f"**🎯 יעד רווח מומלץ:** `{row['target']}`")
+            st.markdown(f"**🛡️ סטופ לוס מגן:** `{row['stop_loss']}`")
             st.markdown(f"**🕯️ ניתוח נרות יפניים:** \n> {row['candlestick']}")
             st.markdown("**💡 תובנות מערכת:**")
             for rsn in row['reasons']:
