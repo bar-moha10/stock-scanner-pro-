@@ -20,7 +20,7 @@ st.markdown("""
     .stTabs [data-baseweb="tab-list"] { gap: 10px; background-color: #0b0f19; padding: 8px; border-radius: 16px; border: 1px solid #1f2937; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
     .stTabs [data-baseweb="tab"] { background-color: transparent; border-radius: 10px; color: #9ca3af; font-weight: 700; padding: 12px 24px; border: none; transition: all 0.3s ease; }
     .stTabs [aria-selected="true"] { background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important; color: #ffffff !important; box-shadow: 0 4px 15px rgba(37,99,235,0.4); }
-    div.stButton > button { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border-radius: 10px; font-weight: 700; border: none; padding: 12px 24px; box-shadow: 0 4px 15px rgba(16,185,129,0.3); transition: all 0.3s ease; }
+    div.stButton > button { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border-radius: 10px; font-weight: 700; border: none; padding: 8px 16px; box-shadow: 0 4px 15px rgba(16,185,129,0.3); transition: all 0.3s ease; }
     div.stButton > button:hover { opacity: 0.95; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16,185,129,0.5); }
     .section-box { background: #0b0f19; border: 1px solid #1f2937; padding: 20px; border-radius: 16px; margin-bottom: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
     </style>
@@ -136,7 +136,6 @@ def analyze_stock(ticker, info, market_type):
         }
 
 def plot_clean_investing_chart(df, ticker_name, prefix, period_key):
-    # סינון הנתונים לפי טווח הזמן שנבחר
     if period_key == "1D":
         chart_df = df.tail(2)
     elif period_key == "1W":
@@ -145,14 +144,13 @@ def plot_clean_investing_chart(df, ticker_name, prefix, period_key):
         chart_df = df.tail(30)
     elif period_key == "1Y":
         chart_df = df.tail(252)
-    else: # 5Y או מקס
+    else: 
         chart_df = df
 
     last_price = float(chart_df['Close'].iloc[-1])
 
     fig = go.Figure()
     
-    # קו המחיר הראשי בצבע תכלת נקי
     fig.add_trace(go.Scatter(
         x=chart_df.index, y=chart_df['Close'],
         mode='lines',
@@ -163,7 +161,6 @@ def plot_clean_investing_chart(df, ticker_name, prefix, period_key):
         hovertemplate=f"תאריך: %{{x|%d/%m/%Y}}<br>מחיר: {prefix}%{{y:,.2f}}<extra></extra>"
     ))
 
-    # הוספת קו אופקי מקווקו למחיר האחרון (בדיוק כמו באפליקציות מסחר)
     fig.add_hline(
         y=last_price, 
         line_dash="dash", 
@@ -190,7 +187,7 @@ def plot_clean_investing_chart(df, ticker_name, prefix, period_key):
             showgrid=True, 
             gridcolor='rgba(255, 255, 255, 0.04)', 
             tickfont=dict(color='#94a3b8', size=10),
-            side='right', # מציג את המספרים בצד ימין כמו ב-Investing
+            side='right',
             autorange=True
         ),
         paper_bgcolor='rgba(0,0,0,0)',
@@ -204,6 +201,24 @@ def render_stock_expander(row, is_tase=False, rank_prefix=""):
     title_text = f"{medal_icon} {rank_prefix} | {row['name']} ({ticker_display}) | מחיר: {row['display_price']} | ציון: {row['score']}/10"
     
     with st.expander(title_text):
+        # שימוש בפריסה רחבה יותר (רוחב מלא למטה) כדי שהכפתורים יסתדרו בשורה יפה
+        state_key = f"period_{row['ticker']}"
+        if state_key not in st.session_state:
+            st.session_state[state_key] = "1M"
+
+        periods = ["1D", "1W", "1M", "1Y", "5Y", "Max"]
+        p_map = {"1D": "1D", "1W": "1W", "1M": "1M", "1Y": "1Y", "5Y": "5Y", "Max": "מקס"}
+        
+        # שורה אופקית תחתונה או עליונה לבחירת הזמנים
+        cols_p = st.columns(6)
+        for i, p_code in enumerate(periods):
+            with cols_p[i]:
+                if st.button(p_map[p_code], key=f"btn_{row['ticker']}_{p_code}", use_container_width=True):
+                    st.session_state[state_key] = p_code
+                    st.rerun()
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
         c1, c2 = st.columns([1, 1.4])
         with c1:
             st.markdown(f"**🎯 יעד רווח מומלץ:** `{row['target']}`")
@@ -213,28 +228,6 @@ def render_stock_expander(row, is_tase=False, rank_prefix=""):
             for rsn in row['reasons']:
                 st.markdown(f"- {rsn}")
         with c2:
-            # הוספת כפתורי בחירת טווח זמן נקיים ממש כמו באפליקציה
-            time_cols = st.columns(6)
-            periods = ["1D", "1W", "1M", "1Y", "5Y", "Max"]
-            
-            # שמירת הסטייט לפי סימבול המניה
-            state_key = f"period_{row['ticker']}"
-            if state_key not in st.session_state:
-                st.session_state[state_key] = "1M"
-
-            selected_p = st.session_state[state_key]
-            
-            # יצירת כפתורי תצוגה קטנים
-            p_map = {"1D": "1D", "1W": "1W", "1M": "1M", "1Y": "1Y", "5Y": "5Y", "Max": "מקס"}
-            
-            cols_p = st.columns(6)
-            for i, p_code in enumerate(periods):
-                with cols_p[i]:
-                    btn_type = "primary" if selected_p == p_code else "secondary"
-                    if st.button(p_map[p_code], key=f"btn_{row['ticker']}_{p_code}", use_container_width=True):
-                        st.session_state[state_key] = p_code
-                        st.rerun()
-
             fig = plot_clean_investing_chart(row['df'], row['name'], row['prefix'], st.session_state[state_key])
             st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
