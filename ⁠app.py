@@ -165,17 +165,17 @@ def plot_candlestick_chart(df, ticker_name):
         high=df['High'] if 'High' in df.columns else df['Close'],
         low=df['Low'] if 'Low' in df.columns else df['Close'],
         close=df['Close'],
-        name='נרות יפניים',
+        name='<span dir="ltr">Japanese Candlesticks</span>',
         increasing_line_color='#10b981', decreasing_line_color='#ef4444'
     ))
     
     if 'MA50' in df.columns:
-        fig.add_trace(go.Scatter(x=df.index, y=df['MA50'], mode='lines', name='MA 50', line=dict(color='#fbbf24', width=1.5, dash='dot')))
+        fig.add_trace(go.Scatter(x=df.index, y=df['MA50'], mode='lines', name='<span dir="ltr">MA 50</span>', line=dict(color='#fbbf24', width=1.5, dash='dot')))
     if 'MA200' in df.columns:
-        fig.add_trace(go.Scatter(x=df.index, y=df['MA200'], mode='lines', name='MA 200', line=dict(color='#c084fc', width=1.5, dash='dash')))
+        fig.add_trace(go.Scatter(x=df.index, y=df['MA200'], mode='lines', name='<span dir="ltr">MA 200</span>', line=dict(color='#c084fc', width=1.5, dash='dash')))
 
     fig.update_layout(
-        title=dict(text=f"ניתוח נרות יפניים מתקדם — {ticker_name}", font=dict(color="#f3f4f6", size=15, family="Segoe UI")),
+        title=dict(text=f"<span dir='ltr'>Advanced Candlestick Analysis — {ticker_name}</span>", font=dict(color="#f3f4f6", size=15, family="Segoe UI")),
         hovermode="x unified",
         margin=dict(l=15, r=15, t=40, b=15),
         height=360,
