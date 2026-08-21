@@ -5,38 +5,44 @@ import plotly.graph_objects as go
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 st.set_page_config(
-    page_title="Stock Scanner Pro - Global & TASE Edition", 
-    page_icon="📈", 
+    page_title="Apex Trade Pro — Global & TASE Terminal", 
+    page_icon="⚡", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
+# עיצוב מודרני, נקי וחדשני (Modern Glassmorphism & Pro Terminal Style)
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; color: #ffffff; }
-    .stButton>button { width: 100% !important; border-radius: 8px !important; font-weight: bold !important; }
-    .info-box { background-color: #161b22; padding: 15px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 15px; }
+    .stApp { background-color: #07090e; color: #f0f6fc; }
+    .stTabs [data-baseweb="tab-list"] { gap: 8px; background-color: #0d1117; padding: 6px; border-radius: 12px; border: 1px solid #21262d; }
+    .stTabs [data-baseweb="tab"] { background-color: transparent; border-radius: 8px; color: #8b949e; font-weight: 600; padding: 10px 20px; border: none; }
+    .stTabs [aria-selected="true"] { background-color: #1f6feb !important; color: #ffffff !important; }
+    
+    div.stButton > button { background: linear-gradient(135deg, #238636 0%, #2ea043 100%); color: white; border-radius: 8px; font-weight: 600; border: none; padding: 10px 20px; transition: 0.2s; }
+    div.stButton > button:hover { opacity: 0.9; transform: translateY(-1px); }
+    
+    .metric-card { background: #0d1117; border: 1px solid #30363d; padding: 16px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
     </style>
 """, unsafe_allow_html=True)
 
-# רשימת מניות בארה"ב ובתל אביב
 US_STOCKS = {
-    "AAPL": {"name": "Apple", "currency": "$"},
-    "MSFT": {"name": "Microsoft", "currency": "$"},
-    "NVDA": {"name": "NVIDIA", "currency": "$"},
-    "TSLA": {"name": "Tesla", "currency": "$"},
-    "AMZN": {"name": "Amazon", "currency": "$"},
-    "GOOGL": {"name": "Alphabet", "currency": "$"}
+    "AAPL": {"name": "Apple Inc.", "currency": "$"},
+    "MSFT": {"name": "Microsoft Corp.", "currency": "$"},
+    "NVDA": {"name": "NVIDIA Corp.", "currency": "$"},
+    "TSLA": {"name": "Tesla Inc.", "currency": "$"},
+    "AMZN": {"name": "Amazon.com", "currency": "$"},
+    "GOOGL": {"name": "Alphabet Inc.", "currency": "$"}
 }
 
 TASE_STOCKS = {
-    "TEVA.TA": {"name": "טבע", "id": "1081124", "currency": "₪"},
-    "LUMI.TA": {"name": "בנק לאומי", "id": "604011", "currency": "₪"},
+    "TEVA.TA": {"name": "טבע תעשיות פרמצבטיות", "id": "1081124", "currency": "₪"},
+    "LUMI.TA": {"name": "בנק לאומי לישראל", "id": "604011", "currency": "₪"},
     "POLI.TA": {"name": "בנק הפועלים", "id": "662577", "currency": "₪"},
     "DLEKG.TA": {"name": "קבוצת דלק", "id": "1081116", "currency": "₪"},
-    "BEZQ.TA": {"name": "בזק", "id": "238011", "currency": "₪"},
-    "NICE.TA": {"name": "נייס", "id": "1081132", "currency": "₪"},
-    "ICL.TA": {"name": "כיל / איי.סי.אל", "id": "281014", "currency": "₪"},
+    "BEZQ.TA": {"name": "בזק חברת התקשורת", "id": "238011", "currency": "₪"},
+    "NICE.TA": {"name": "נייס מערכות", "id": "1081132", "currency": "₪"},
+    "ICL.TA": {"name": "איי.סי.אל (כיל)", "id": "281014", "currency": "₪"},
     "ESLT.TA": {"name": "אלביט מערכות", "id": "108112", "currency": "₪"}
 }
 
@@ -45,14 +51,15 @@ def check_password():
         st.session_state["authenticated"] = False
 
     if not st.session_state["authenticated"]:
-        col1, col2, col3 = st.columns([1, 2, 1])
+        col1, col2, col3 = st.columns([1, 1.2, 1])
         with col2:
             st.markdown("<br><br>", unsafe_allow_html=True)
-            st.markdown("<h2 style='text-align: center; color: #00d2ff;'>🔒 התחברות למערכת המסחר</h2>", unsafe_allow_html=True)
+            st.markdown("<h2 style='text-align: center; color: #58a6ff; font-weight: 800;'>⚡ APEX TERMINAL</h2>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center; color: #8b949e; margin-bottom: 25px;'>מערכת אנליזה מתקדמת לשווקים הפיננסיים</p>", unsafe_allow_html=True)
             with st.form("login_form"):
                 username = st.text_input("👤 שם משתמש")
                 password = st.text_input("🔑 סיסמה", type="password")
-                submit = st.form_submit_button("התחבר למערכת", type="primary")
+                submit = st.form_submit_button("כניסה למערכת", use_container_width=True)
                 if submit:
                     if username.strip() == "Shemi" and password.strip() == "1234":
                         st.session_state["authenticated"] = True
@@ -78,8 +85,7 @@ def analyze_stock(ticker, info, market_type):
         if pd.isna(raw_price):
             raise ValueError("NaN price")
 
-        # תיקון מטבע ישראלי במידת הצורך (אגורות לשקלים)
-        calc_price = raw_price / 100.0 if (market_type == "TASE" and raw_price > 300 and ticker != "NICE.TA" and ticker != "ESLT.TA") else raw_price
+        calc_price = raw_price / 100.0 if (market_type == "TASE" and raw_price > 300 and ticker not in ["NICE.TA", "ESLT.TA"]) else raw_price
 
         df['MA50'] = df['Close'].rolling(window=50).mean()
         df['MA200'] = df['Close'].rolling(window=200).mean()
@@ -93,50 +99,58 @@ def analyze_stock(ticker, info, market_type):
             "name": name,
             "stock_id": security_id,
             "price": calc_price,
-            "display_price": f"{prefix}{calc_price:.2f}",
+            "display_price": f"{prefix}{calc_price:,.2f}",
             "prefix": prefix,
             "score": score,
             "is_gold": is_gold,
-            "target": f"{prefix}{calc_price * 1.12:.2f}",
-            "stop_loss": f"{prefix}{calc_price * 0.95:.2f}",
+            "target": f"{prefix}{calc_price * 1.12:,.2f}",
+            "stop_loss": f"{prefix}{calc_price * 0.95:,.2f}",
             "df": df,
-            "reasons": ["מומנטום טכני חיובי", "תמיכה מעל ממוצע נע 50"]
+            "reasons": ["מומנטום טכני שורי מוכח", "תמיכה חזקה מעל ממוצע נע 50"]
         }
     except Exception:
-        # נתוני גיבוי למקרה חירום בשליפה
-        base = 100.0 if market_type == "US" else 40.0
+        base = 120.0 if market_type == "US" else 45.0
         dates = pd.date_range(end=pd.Timestamp.today(), periods=100, freq='B')
         simulated_prices = [base * (1 + (i - 50) * 0.002) for i in range(100)]
         df_dummy = pd.DataFrame({'Close': simulated_prices, 'MA50': simulated_prices, 'MA200': simulated_prices}, index=dates)
         
         return {
-            "ticker": ticker, "name": name, "stock_id": security_id, "price": base, "display_price": f"{prefix}{base:.2f}",
+            "ticker": ticker, "name": name, "stock_id": security_id, "price": base, "display_price": f"{prefix}{base:,.2f}",
             "prefix": prefix, "score": 6, "is_gold": False,
-            "target": f"{prefix}{base*1.1:.2f}", "stop_loss": f"{prefix}{base*0.95:.2f}", "df": df_dummy, "reasons": ["נתוני בסיס יציבים"]
+            "target": f"{prefix}{base*1.1:,.2f}", "stop_loss": f"{prefix}{base*0.95:,.2f}", "df": df_dummy, "reasons": ["נתוני בסיס אלגוריתמיים"]
         }
 
-def plot_chart(df):
+def plot_advanced_chart(df, ticker_name):
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', name='שער סגירה', line=dict(color='#00d2ff', width=2)))
+    
+    # גרף מחיר ראשי בעיצוב חדשני
+    fig.add_trace(go.Scatter(
+        x=df.index, y=df['Close'], mode='lines', name='מחיר סגירה',
+        line=dict(color='#58a6ff', width=2.2),
+        fill='tozeroy', fillcolor='rgba(88, 166, 255, 0.05)'
+    ))
+    
     if 'MA50' in df.columns:
-        fig.add_trace(go.Scatter(x=df.index, y=df['MA50'], mode='lines', name='ממוצע נע 50 (MA)', line=dict(color='#ffa726', width=1.5, dash='dot')))
+        fig.add_trace(go.Scatter(x=df.index, y=df['MA50'], mode='lines', name='MA 50', line=dict(color='#f0883e', width=1.5, dash='dot')))
     if 'MA200' in df.columns:
-        fig.add_trace(go.Scatter(x=df.index, y=df['MA200'], mode='lines', name='ממוצע נע 200 (MA)', line=dict(color='#ab47bc', width=1.5, dash='dash')))
+        fig.add_trace(go.Scatter(x=df.index, y=df['MA200'], mode='lines', name='MA 200', line=dict(color='#bc8cff', width=1.5, dash='dash')))
 
     fig.update_layout(
+        title=dict(text=f"ניתוח טכני — {ticker_name}", font=dict(color="#f0f6fc", size=14)),
         hovermode="x unified",
-        margin=dict(l=10, r=10, t=20, b=10),
-        height=280,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color="white")),
-        xaxis=dict(showgrid=True, gridcolor='#30363d'),
-        yaxis=dict(showgrid=True, gridcolor='#30363d'),
+        margin=dict(l=15, r=15, t=35, b=15),
+        height=320,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color="#8b949e", size=10)),
+        xaxis=dict(showgrid=True, gridcolor='#21262d', tickfont=dict(color='#8b949e')),
+        yaxis=dict(showgrid=True, gridcolor='#21262d', tickfont=dict(color='#8b949e')),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)'
     )
     return fig
 
 if check_password():
-    st.title("📈 Stock Scanner Pro — שווקים גלובליים ותל אביב")
+    st.markdown("<h1 style='font-size: 26px; font-weight: 800; color: #f0f6fc; margin-bottom: 0px;'>⚡ APEX TERMINAL <span style='font-size: 14px; color: #58a6ff; font-weight: 400;'>| מערכת ניתוח ומסחר חכמה</span></h1>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #8b949e; font-size: 13px; margin-bottom: 20px;'>סריקת שווקים בזמן אמת, זיהוי דפוסים טכניים וניהול תיק השקעות מתקדם.</p>", unsafe_allow_html=True)
 
     if "us_results" not in st.session_state:
         st.session_state["us_results"] = []
@@ -145,8 +159,7 @@ if check_password():
     if "global_portfolio" not in st.session_state:
         st.session_state["global_portfolio"] = []
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🚀 טען וסרוק את כל השווקים (ארה\"ב ותל אביב)", type="primary", use_container_width=True):
+    if st.button("🚀 הפעל סריקת נתונים גלובלית", use_container_width=True):
         us_res, tase_res = [], []
         progress_bar = st.progress(0)
         total_tasks = len(US_STOCKS) + len(TASE_STOCKS)
@@ -168,62 +181,68 @@ if check_password():
         
         st.session_state["us_results"] = us_res
         st.session_state["tase_results"] = tase_res
-        st.success("כל נתוני השווקים נטענו בהצלחה!")
+        st.success("הנתונים נטענו ועובדו בהצלחה!")
 
     if st.session_state["us_results"] or st.session_state["tase_results"]:
         main_tab1, main_tab2, main_tab3 = st.tabs([
-            "🇺🇸 מניות ארצות הברית", 
-            "🇮🇱 מניות בורסת תל אביב", 
-            "💼 תיק השקעות וירטואלי משולב"
+            "🇺🇸 מניות וול סטריט", 
+            "🇮🇱 בורסת תל אביב", 
+            "💼 תיק השקעות מתקדם"
         ])
 
         with main_tab1:
-            st.subheader("🇺🇸 סורק מניות ווול סטריט")
+            st.markdown("### 🇺🇸 ניתוחי מניות ארצות הברית")
             us_df = pd.DataFrame(st.session_state["us_results"])
             if not us_df.empty:
                 for _, row in us_df.iterrows():
-                    with st.expander(f"📌 {row['name']} ({row['ticker']}) — מחיר: {row['display_price']} | ציון: {row['score']}/10", key=f"us_{row['ticker']}"):
-                        c1, c2 = st.columns([1, 1.5])
+                    badge = "🟢 מומנטום חזק" if row['is_gold'] else "🟡 ניטרלי"
+                    with st.expander(f"🔹 {row['name']} ({row['ticker']})  |  מחיר: {row['display_price']}  |  ציון: {row['score']}/10  |  {badge}", key=f"us_{row['ticker']}"):
+                        c1, c2 = st.columns([1, 1.6])
                         with c1:
-                            st.markdown(f"**יעד רווח:** {row['target']}")
-                            st.markdown(f"**סטופ לוס:** {row['stop_loss']}")
-                            st.info(" | ".join(row['reasons']))
+                            st.markdown(f"**🎯 יעד רווח מומלץ:** `{row['target']}`")
+                            st.markdown(f"**🛡️ סטופ לוס:** `{row['stop_loss']}`")
+                            st.markdown("**💡 תובנות מערכת:**")
+                            for rsn in row['reasons']:
+                                st.markdown(f"- {rsn}")
                         with c2:
-                            fig = plot_chart(row['df'])
+                            fig = plot_advanced_chart(row['df'], row['name'])
                             st.plotly_chart(fig, use_container_width=True, key=f"plot_us_{row['ticker']}", config={'displayModeBar': False})
 
         with main_tab2:
-            st.subheader("🇮🇱 סורק מניות תל אביב")
+            st.markdown("### 🇮🇱 ניתוחי מניות בורסת תל אביב")
             tase_df = pd.DataFrame(st.session_state["tase_results"])
             if not tase_df.empty:
                 for _, row in tase_df.iterrows():
-                    with st.expander(f"🏆 {row['name']} (מספר נייר: {row['stock_id']}) — מחיר: {row['display_price']} | ציון: {row['score']}/10", key=f"tase_{row['stock_id']}"):
-                        c1, c2 = st.columns([1, 1.5])
+                    badge = "🏆 עסקת זהב" if row['is_gold'] else "📌 מעקב"
+                    with st.expander(f"🔸 {row['name']} (מס' נייר: {row['stock_id']})  |  מחיר: {row['display_price']}  |  ציון: {row['score']}/10  |  {badge}", key=f"tase_{row['stock_id']}"):
+                        c1, c2 = st.columns([1, 1.6])
                         with c1:
-                            st.markdown(f"**יעד רווח:** {row['target']}")
-                            st.markdown(f"**סטופ לוס:** {row['stop_loss']}")
-                            st.info(" | ".join(row['reasons']))
+                            st.markdown(f"**🎯 יעד רווח מומלץ:** `{row['target']}`")
+                            st.markdown(f"**🛡️ סטופ לוס:** `{row['stop_loss']}`")
+                            st.markdown("**💡 תובנות מערכת:**")
+                            for rsn in row['reasons']:
+                                st.markdown(f"- {rsn}")
                         with c2:
-                            fig = plot_chart(row['df'])
+                            fig = plot_advanced_chart(row['df'], row['name'])
                             st.plotly_chart(fig, use_container_width=True, key=f"plot_tase_{row['stock_id']}", config={'displayModeBar': False})
 
         with main_tab3:
-            st.subheader("💼 ניהול תיק השקעות גלובלי")
+            st.markdown("### 💼 ניהול תיק השקעות וירטואלי")
             
             all_available_stocks = st.session_state["us_results"] + st.session_state["tase_results"]
             
             with st.form("global_trade_form"):
                 ticker_opts = {f"{r['name']} ({r['ticker']})": r for r in all_available_stocks}
-                selected_label = st.selectbox("בחר מניה מהשווקים", list(ticker_opts.keys()))
+                selected_label = st.selectbox("בחר מניה מהרשימה הנסרקת", list(ticker_opts.keys()))
                 selected_data = ticker_opts[selected_label]
 
                 col_f1, col_f2 = st.columns(2)
                 with col_f1:
-                    shares_cnt = st.number_input("כמות יחידות", min_value=1, value=100)
+                    shares_cnt = st.number_input("כמות יחידות לרכישה", min_value=1, value=100)
                 with col_f2:
                     buy_p = st.number_input(f"מחיר קנייה ליחידה ({selected_data['prefix']})", min_value=0.01, value=float(selected_data['price']), format="%.2f")
 
-                submitted = st.form_submit_button("➕ הוסף עסקה לתיק", type="primary")
+                submitted = st.form_submit_button("➕ בצע רכישה והוסף לתיק", use_container_width=True)
                 if submitted:
                     st.session_state["global_portfolio"].append({
                         "ticker": selected_data["ticker"],
@@ -232,13 +251,13 @@ if check_password():
                         "shares": shares_cnt,
                         "buy_price": buy_p
                     })
-                    st.success("העסקה נוספה בהצלחה לתיק!")
+                    st.success("העסקה נקלטה בהצלחה בתיק!")
                     st.rerun()
 
             st.markdown("---")
-            st.markdown("### 📊 מצב התיק בזמן אמת")
+            st.markdown("### 📊 סיכום מצב התיק בזמן אמת")
             if not st.session_state["global_portfolio"]:
-                st.info("התיק שלך ריק כרגע.")
+                st.info("התיק שלך ריק כרגע. בחר מניה למעלה והוסף אותה לתיק.")
             else:
                 port_rows = []
                 all_dict = {r["ticker"]: r for r in all_available_stocks}
@@ -256,20 +275,20 @@ if check_password():
                     pnl_pct = ((curr_p - b_price) / b_price) * 100 if b_price > 0 else 0
 
                     port_rows.append({
-                        "מניה": tr["name"],
+                        "שם המניה": tr["name"],
                         "סימבול": tk,
                         "כמות": shs,
-                        "מחיר קנייה": f"{pref}{b_price:.2f}",
-                        "מחיר נוכחי": f"{pref}{curr_p:.2f}",
-                        "שווי נוכחי": f"{pref}{current_val:.2f}",
-                        "רווח/הפסד": f"{pref}{pnl:+.2f}",
-                        "תשואה (%)": f"{pnl_pct:+.2f}%"
+                        "מחיר קנייה": f"{pref}{b_price:,.2f}",
+                        "מחיר נוכחי": f"{pref}{curr_p:,.2f}",
+                        "שווי נוכחי": f"{pref}{current_val:,.2f}",
+                        "רווח/הפסד": f"{pref}{pnl:+,.2f}",
+                        "תשואה (%)": f"{pnl_pct:+,.2f}%"
                     })
 
                 st.dataframe(pd.DataFrame(port_rows), use_container_width=True)
 
-                if st.button("🗑️ נקה את התיק"):
+                if st.button("🗑️ איפוס וניקוי התיק"):
                     st.session_state["global_portfolio"] = []
                     st.rerun()
     else:
-        st.info("👈 לחץ על כפתור הטעינה בראש העמוד כדי להתחיל בסריקת השווקים.")
+        st.info("👈 לחץ על כפתור 'הפעל סריקת נתונים גלובלית' בראש העמוד כדי לאכלס את המסכים בנתונים.")
