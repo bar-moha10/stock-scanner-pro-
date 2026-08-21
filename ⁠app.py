@@ -133,7 +133,6 @@ def analyze_single_ticker(ticker):
         
         ma50_val = float(df['MA50'].iloc[-1]) if len(df) >= 50 and not pd.isna(df['MA50'].iloc[-1]) else None
         
-        # 5 ניתוחי עסקאות הזהב: בדיקת תנאים מתקדמת לקבלת ציון גבוה
         score_10 = 9 if (ma50_val and calc_price > ma50_val * 1.03) else (8 if (ma50_val and calc_price > ma50_val) else 6)
         rec_title = f"✅ שורי חזק ({score_10}/10)" if score_10 >= 6 else f"🟡 ניטרלי ({score_10}/10)"
         is_golden = score_10 >= 8
@@ -278,7 +277,7 @@ if check_password():
                             st.markdown(f"**תבנית נר:** {row['תבנית נר']}")
                             st.markdown(f"**RSI:** {row['RSI']}")
                             st.markdown(f"**מחיר יעד:** {row['מחיר יעד']}")
-                            st.markdown(f"**סטופ לוס:** {row['סטופ لוס']}")
+                            st.markdown(f"**סטופ לוס:** {row['סטופ לוס']}")
                             st.markdown(f"**פוטנציאל רווח:** {row['פוטנציאל רווח (%)']}%")
                             st.markdown(f"**יחס סיכוי/סיכון:** {row['יחס סיכוי/סיכון']}")
                             if row['נימוקים']:
