@@ -2,6 +2,8 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
+import json
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 st.set_page_config(
@@ -10,6 +12,25 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# --- ניהול שמירת תיק השקעות לקובץ ---
+PORTFOLIO_FILE = "portfolio.json"
+
+def load_portfolio():
+    if os.path.exists(PORTFOLIO_FILE):
+        try:
+            with open(PORTFOLIO_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def save_portfolio(portfolio):
+    try:
+        with open(PORTFOLIO_FILE, "w", encoding="utf-8") as f:
+            json.dump(portfolio, f, ensure_ascii=False, indent=4)
+    except Exception:
+        pass
 
 st.markdown("""
     <style>
@@ -251,8 +272,9 @@ def plot_interactive_chart(df, ticker, prefix):
 if check_password():
     st.title("📈 Stock Scanner Pro - Top 10")
     
+    # טעינת התיק מהקובץ המקומי במקום זיכרון זמני
     if "virtual_portfolio" not in st.session_state:
-        st.session_state["virtual_portfolio"] = []
+        st.session_state["virtual_portfolio"] = load_portfolio()
 
     us_tickers = get_all_us_tickers()
     israel_tickers = get_all_israel_tickers()
@@ -401,12 +423,14 @@ if check_password():
                     if shares_qty <= 0:
                         st.error("הסכום שהוזן קטן מדי מכדי לקנות אפילו יחידה אחת שלמה.")
                     else:
-                        st.session_state["virtual_portfolio"].append({
+                        new_trade = {
                             "ticker": selected_ticker_port,
                             "shares": shares_qty,
                             "buy_price": buy_price
-                        })
-                        st.success(f"העסקה נוספה בהצלחה! ({shares_qty} יחידות)")
+                        }
+                        st.session_state["virtual_portfolio"].append(new_trade)
+                        save_portfolio(st.session_state["virtual_portfolio"])
+                        st.success(f"העסקה נוספה בהצלחה ונשמרה בקובץ! ({shares_qty} יחידות)")
                         st.rerun()
 
             st.markdown("---")
@@ -468,6 +492,7 @@ if check_password():
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("🗑️ נקה את כל התיק"):
                     st.session_state["virtual_portfolio"] = []
+                    save_portfolio([])
                     st.rerun()
     else:
         st.info("👈 לחץ על כפתור **'הפעל סריקת שוק מלאה עכשיו'** כדי לטעון את הנתונים ולנהל את התיק הווירטואלי.")
