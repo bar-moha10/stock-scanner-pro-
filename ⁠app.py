@@ -89,16 +89,13 @@ def detect_candlestick_patterns(df):
     
     patterns = []
     
-    # Doji
-    if body_curr <= range_curr * 0.1:
+    if range_curr > 0 and body_curr <= range_curr * 0.1:
         patterns.append("✨ נר דוג'י (Doji) - אי-החלטה בשוק, פוטנציאל לשינוי מגמה")
     
-    # Bullish Hammer / Pinbar
     lower_shadow = min(c_curr['Open'], c_curr['Close']) - c_curr['Low']
     if lower_shadow > body_curr * 2 and (c_curr['High'] - max(c_curr['Open'], c_curr['Close'])) < body_curr * 0.5:
         patterns.append("🔨 נר פטיש שורי (Hammer) - דחיית מחירים נמוכים ואיתות היפוך חיובי")
         
-    # Bullish Engulfing
     if c_prev['Close'] < c_prev['Open'] and c_curr['Close'] > c_curr['Open'] and c_curr['Close'] >= c_prev['Open'] and c_curr['Open'] <= c_prev['Close']:
         patterns.append("🟢 נר בולע שורי (Bullish Engulfing) - עוצמה חזקה של הקונים שבולעים את המוכרים")
         
