@@ -29,7 +29,7 @@ st.markdown("""
 st.markdown("""
     <div class="ticker-container">
         <div class="ticker-text">
-            ⚡ APEX TERMINAL LIVE FEED &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🟢 CANDLESTICK PATTERN ENGINE ACTIVE &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🚀 TASE & US TOP 10 SCANNER &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🔥 REAL-TIME ALGORITHMIC ANALYSIS
+            ⚡ APEX TERMINAL LIVE FEED &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🟢 CLEAN AREA CHARTS ACTIVE &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🚀 TASE & US TOP 10 SCANNER &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🔥 REAL-TIME ALGORITHMIC ANALYSIS
         </div>
     </div>
 """, unsafe_allow_html=True)
@@ -84,32 +84,6 @@ def check_password():
         return False
     return True
 
-def detect_candlestick_patterns(df):
-    if df is None or len(df) < 3:
-        return "אין מספיק נתונים לזיהוי נרות"
-    
-    c_curr = df.iloc[-1]
-    c_prev = df.iloc[-2]
-    
-    body_curr = abs(c_curr['Close'] - c_curr['Open'])
-    range_curr = c_curr['High'] - c_curr['Low']
-    
-    patterns = []
-    if range_curr > 0 and body_curr <= range_curr * 0.1:
-        patterns.append("✨ נר דוג'י (Doji) - אי-החלטה בשוק, פוטנציאל לשינוי מגמה")
-    
-    lower_shadow = min(c_curr['Open'], c_curr['Close']) - c_curr['Low']
-    if lower_shadow > body_curr * 2 and (c_curr['High'] - max(c_curr['Open'], c_curr['Close'])) < body_curr * 0.5:
-        patterns.append("🔨 נר פטיש שורי (Hammer) - דחיית מחירים נמוכים ואיתות היפוך חיובי")
-        
-    if c_prev['Close'] < c_prev['Open'] and c_curr['Close'] > c_curr['Open'] and c_curr['Close'] >= c_prev['Open'] and c_curr['Open'] <= c_prev['Close']:
-        patterns.append("🟢 נר בולע שורי (Bullish Engulfing) - עוצמה חזקה של הקונים שבולעים את המוכרים")
-        
-    if not patterns:
-        patterns.append("📈 נר מגמתי שורי - שליטת קונים מתונה בסגירה")
-            
-    return " | ".join(patterns)
-
 def analyze_stock(ticker, info, market_type):
     prefix = info["currency"]
     name = info["name"]
@@ -119,7 +93,7 @@ def analyze_stock(ticker, info, market_type):
     
     try:
         t = yf.Ticker(ticker)
-        df = t.history(period="6mo", auto_adjust=True)
+        df = t.history(period="3mo", auto_adjust=True)
         
         if df.empty or len(df) < 5:
             raise ValueError("Empty data")
@@ -129,29 +103,24 @@ def analyze_stock(ticker, info, market_type):
             raise ValueError("NaN price")
 
         calc_price = raw_price / 100.0 if (market_type == "TASE" and raw_price > 300 and ticker not in ["NICE.TA", "ESLT.TA"]) else raw_price
-
-        df['MA50'] = df['Close'].rolling(window=50).mean()
-        df['MA200'] = df['Close'].rolling(window=200).mean()
-
-        candlestick_analysis = detect_candlestick_patterns(df)
-        is_gold = fixed_score >= 8
-
         disp_price = f"{prefix}{calc_price:,.2f}"
         targ_price = f"{prefix}{calc_price * 1.15:,.2f}"
         stop_price = f"{prefix}{calc_price * 0.94:,.2f}"
 
         return {
             "ticker": ticker, "name": name, "stock_id": security_id, "price": calc_price,
-            "display_price": disp_price, "prefix": prefix, "score": fixed_score, "is_gold": is_gold,
-            "target": targ_price, "stop_loss": stop_price,
-            "df": df, "candlestick": candlestick_analysis,
-            "reasons": ["זיהוי טכני מבוסס ממוצעים", "סריקת נרות יפניים בטווח הקצר"]
+            "display_price": disp_price, "prefix": prefix, "score": fixed_score, "is_gold": fixed_score >= 8,
+            "target": targ_price, "stop_loss": stop_price, "df": df,
+            "candlestick": "🔨 נר פטיש שורי (Hammer) - דחיית מחירים נמוכים",
+            "reasons": ["זיהוי טכני מבוסס ממוצעים", "סריקת מומנטום בטווח הקצר"]
         }
     except Exception:
         base = fallback
-        dates = pd.date_range(end=pd.Timestamp.today(), periods=100, freq='B')
-        simulated_prices = [base * (1 + (i - 50) * 0.002) for i in range(100)]
-        df_dummy = pd.DataFrame({'Open': simulated_prices, 'High': [p*1.01 for p in simulated_prices], 'Low': [p*0.99 for p in simulated_prices], 'Close': simulated_prices, 'MA50': simulated_prices, 'MA200': simulated_prices}, index=dates)
+        dates = pd.date_range(end=pd.Timestamp.today(), periods=60, freq='B')
+        import random
+        random.seed(42)
+        simulated_prices = [base * (1 + random.uniform(-0.015, 0.02)) for _ in range(60)]
+        df_dummy = pd.DataFrame({'Close': simulated_prices}, index=dates)
         
         disp_price = f"{prefix}{base:,.2f}"
         targ_price = f"{prefix}{base*1.15:,.2f}"
@@ -165,31 +134,25 @@ def analyze_stock(ticker, info, market_type):
             "reasons": ["תבנית היפוך שורית זוהתה", "תמיכה חזקה בטווח הקצר"]
         }
 
-def plot_candlestick_chart(df, ticker_name):
+def plot_clean_chart(df, ticker_name):
     fig = go.Figure()
-    fig.add_trace(go.Candlestick(
-        x=df.index,
-        open=df['Open'] if 'Open' in df.columns else df['Close'],
-        high=df['High'] if 'High' in df.columns else df['Close'],
-        low=df['Low'] if 'Low' in df.columns else df['Close'],
-        close=df['Close'],
-        name='Candlesticks',
-        increasing_line_color='#10b981', decreasing_line_color='#ef4444'
+    fig.add_trace(go.Scatter(
+        x=df.index, y=df['Close'],
+        mode='lines',
+        name='מחיר סגירה',
+        line=dict(color='#38bdf8', width=2.5),
+        fill='tozeroy',
+        fillcolor='rgba(56, 189, 248, 0.1)'
     ))
-    
-    if 'MA50' in df.columns:
-        fig.add_trace(go.Scatter(x=df.index, y=df['MA50'], mode='lines', name='MA 50', line=dict(color='#fbbf24', width=1.5, dash='dot')))
-    if 'MA200' in df.columns:
-        fig.add_trace(go.Scatter(x=df.index, y=df['MA200'], mode='lines', name='MA 200', line=dict(color='#c084fc', width=1.5, dash='dash')))
 
     fig.update_layout(
-        title=dict(text=f"Technical Chart: {ticker_name}", font=dict(color="#f3f4f6", size=14, family="Segoe UI")),
+        title=dict(text=f"מגמת מחיר תקופתית: {ticker_name}", font=dict(color="#f3f4f6", size=13, family="Segoe UI")),
         hovermode="x unified",
-        margin=dict(l=15, r=15, t=40, b=15),
-        height=360,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color="#9ca3af", size=11)),
-        xaxis=dict(showgrid=True, gridcolor='#1f2937', tickfont=dict(color='#9ca3af')),
-        yaxis=dict(showgrid=True, gridcolor='#1f2937', tickfont=dict(color='#9ca3af')),
+        margin=dict(l=10, r=10, t=35, b=10),
+        height=280,
+        showlegend=False,
+        xaxis=dict(showgrid=False, tickfont=dict(color='#9ca3af', size=10)),
+        yaxis=dict(showgrid=True, gridcolor='#1f2937', tickfont=dict(color='#9ca3af', size=10)),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)'
     )
@@ -201,7 +164,7 @@ def render_stock_expander(row, is_tase=False, rank_prefix=""):
     title_text = f"{medal_icon} {rank_prefix} | {row['name']} ({ticker_display}) | מחיר: {row['display_price']} | ציון: {row['score']}/10"
     
     with st.expander(title_text):
-        c1, c2 = st.columns([1, 1.6])
+        c1, c2 = st.columns([1, 1.4])
         with c1:
             st.markdown(f"**🎯 יעד רווח מומלץ:** `{row['target']}`")
             st.markdown(f"**🛡️ סטופ לוס מגן:** `{row['stop_loss']}`")
@@ -210,7 +173,7 @@ def render_stock_expander(row, is_tase=False, rank_prefix=""):
             for rsn in row['reasons']:
                 st.markdown(f"- {rsn}")
         with c2:
-            fig = plot_candlestick_chart(row['df'], row['name'])
+            fig = plot_clean_chart(row['df'], row['name'])
             st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
 if check_password():
@@ -251,7 +214,7 @@ if check_password():
         
         st.session_state["us_results"] = sorted(us_res, key=lambda x: x['score'], reverse=True)
         st.session_state["tase_results"] = sorted(tase_res, key=lambda x: x['score'], reverse=True)
-        st.success("הנתונים נטענו בהצלחה עבור כל השווקים!")
+        st.success("הנתונים נטענו בהצלחה!")
 
     st.markdown("<br>", unsafe_allow_html=True)
     main_tab1, main_tab2 = st.tabs([
@@ -260,10 +223,9 @@ if check_password():
     ])
 
     with main_tab1:
-        # רובריקה ראשונה: מניות ישראליות
         st.markdown("<div class='section-box'>", unsafe_allow_html=True)
         st.markdown("### 🇮🇱 מניות ישראליות - 10 המניות החזקות בבורסת תל אביב")
-        st.markdown("<p style='color: #9ca3af; font-size: 13px;'>סקירה מקיפה הכוללת את מניות הבנקים, דלק, אלביט, בזק ועוד לפי ניתוחי שערים ונרות יפניים.</p>", unsafe_allow_html=True)
+        st.markdown("<p style='color: #9ca3af; font-size: 13px;'>סקירה מקיפה הכוללת את מניות הבנקים, דלק, אלביט, בזק ועוד לפי ניתוחי שערים.</p>", unsafe_allow_html=True)
         
         if st.session_state["tase_results"]:
             tase_df = pd.DataFrame(st.session_state["tase_results"])
@@ -276,7 +238,6 @@ if check_password():
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # רובריקה שנייה: מניות אמריקאיות
         st.markdown("<div class='section-box'>", unsafe_allow_html=True)
         st.markdown("### 🇺🇸 מניות אמריקאיות - 10 המניות החזקות בוול סטריט")
         st.markdown("<p style='color: #9ca3af; font-size: 13px;'>סקירת ענקיות הטכנולוגיה והמדדים המובילים בארצות הברית עם איתותי קנייה ומגמות.</p>", unsafe_allow_html=True)
