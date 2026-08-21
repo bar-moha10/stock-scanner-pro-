@@ -11,31 +11,20 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# עיצוב חדשני, אגרסיבי, כהה ויוקרתי בסגנון טרמינל מתקדם
 st.markdown("""
     <style>
     .stApp { background-color: #030712; color: #f3f4f6; font-family: 'Segoe UI', Roboto, Helvetica, sans-serif; }
-    
-    /* Ticker Tape Animation */
     .ticker-container { background: #0b0f19; border-bottom: 1px solid #1f2937; border-top: 1px solid #1f2937; padding: 8px 0; overflow: hidden; white-space: nowrap; margin-bottom: 20px; }
     .ticker-text { display: inline-block; animation: marquee 30s linear infinite; color: #38bdf8; font-weight: 600; font-size: 13px; }
     @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
-
-    /* Tabs Styling */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; background-color: #0b0f19; padding: 8px; border-radius: 16px; border: 1px solid #1f2937; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
     .stTabs [data-baseweb="tab"] { background-color: transparent; border-radius: 10px; color: #9ca3af; font-weight: 700; padding: 12px 24px; border: none; transition: all 0.3s ease; }
     .stTabs [aria-selected="true"] { background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important; color: #ffffff !important; box-shadow: 0 4px 15px rgba(37,99,235,0.4); }
-
-    /* Buttons */
     div.stButton > button { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border-radius: 10px; font-weight: 700; border: none; padding: 12px 24px; box-shadow: 0 4px 15px rgba(16,185,129,0.3); transition: all 0.3s ease; }
     div.stButton > button:hover { opacity: 0.95; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16,185,129,0.5); }
-
-    /* Expander Glassmorphism */
-    streamlit-expander { background: #0b0f19 !important; border: 1px solid #1f2937 !important; border-radius: 14px !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# סרגל רץ עליון לאווירת מסחר אמיתית
 st.markdown("""
     <div class="ticker-container">
         <div class="ticker-text">
@@ -161,7 +150,6 @@ def plot_advanced_chart(df, ticker_name):
     return fig
 
 if check_password():
-    # כותרת ראשית מעוצבת
     col_h1, col_h2 = st.columns([3, 1])
     with col_h1:
         st.markdown("<h1 style='font-size: 30px; font-weight: 900; color: #f3f4f6; margin-bottom: 0px;'>⚡ APEX X <span style='font-size: 15px; color: #38bdf8; font-weight: 500;'>| Pro Trading Terminal</span></h1>", unsafe_allow_html=True)
@@ -313,5 +301,3 @@ if check_password():
                     st.rerun()
     else:
         st.info("👈 לחץ על כפתור 'הפעל סריקת שווקים עמוקה בזמן אמת' כדי להתחיל לעבוד עם הטרמינל.")
-
-מה תרצה להוסיף עכשיו? אולי אינדיקטור טכני נוסף (כמו RSI או MACD) או ממשק התראות קיצוניות?
