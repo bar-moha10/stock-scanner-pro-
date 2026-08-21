@@ -33,7 +33,6 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# 10 המניות המובילות בוול סטריט
 US_STOCKS = {
     "NVDA": {"name": "NVIDIA Corp.", "currency": "$", "fallback": 125.0, "fixed_score": 10},
     "MSFT": {"name": "Microsoft Corp.", "currency": "$", "fallback": 430.0, "fixed_score": 9},
@@ -47,7 +46,6 @@ US_STOCKS = {
     "INTC": {"name": "Intel Corp.", "currency": "$", "fallback": 22.0, "fixed_score": 7}
 }
 
-# 10 המניות המובילות בתל אביב
 TASE_STOCKS = {
     "MZRH.TA": {"name": "בנק מזרחי טפחות", "id": "662668", "currency": "₪", "fallback": 150.0, "fixed_score": 10},
     "DLEKG.TA": {"name": "קבוצת דלק", "id": "1081116", "currency": "₪", "fallback": 85.0, "fixed_score": 9},
@@ -222,7 +220,7 @@ if check_password():
         st.markdown("<h1 style='font-size: 30px; font-weight: 900; color: #f3f4f6; margin-bottom: 0px;'>⚡ APEX X <span style='font-size: 15px; color: #38bdf8; font-weight: 500;'>| Pro Trading Terminal</span></h1>", unsafe_allow_html=True)
         st.markdown("<p style='color: #9ca3af; font-size: 14px; margin-top: 5px;'>מערכת ניתוח מניות חכמה הכוללת סורק עשרת המובילות וניהול תיקים עתיר ביצועים.</p>", unsafe_allow_html=True)
     with col_h2:
-        st.markdown("<div style='text-align: right; padding-top: 10px;'><span style='background: #064e3b; color: #34d399; padding: 6px 14px; border-radius: 20px; font-weight: 700; font-size: 12px; border: 1px solid #059669;'>🟢 SYSTEM ONLINE</span></div>", unsafe_allow_html=Type=None if 'Type' in globals() else True)
+        st.markdown("<div style='text-align: right; padding-top: 10px;'><span style='background: #064e3b; color: #34d399; padding: 6px 14px; border-radius: 20px; font-weight: 700; font-size: 12px; border: 1px solid #059669;'>🟢 SYSTEM ONLINE</span></div>", unsafe_allow_html=True)
 
     if "us_results" not in st.session_state:
         st.session_state["us_results"] = []
@@ -252,7 +250,6 @@ if check_password():
                 completed += 1
                 progress_bar.progress(completed / total_tasks)
         
-        # מיון לפי הציון הקבוע המוגדר לרשימת ה-10 המובילות
         st.session_state["us_results"] = sorted(us_res, key=lambda x: x['score'], reverse=True)
         st.session_state["tase_results"] = sorted(tase_res, key=lambda x: x['score'], reverse=True)
         st.success("הנתונים נטענו בהצלחה! 10 המניות החזקות ביותר בכל שוק מוכנות.")
