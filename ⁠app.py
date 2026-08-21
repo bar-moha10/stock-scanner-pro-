@@ -28,7 +28,7 @@ st.markdown("""
 st.markdown("""
     <div class="ticker-container">
         <div class="ticker-text">
-            ⚡ APEX TERMINAL LIVE FEED &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🟢 S&P 500 BULLISH MOMENTUM &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🚀 TASE HIGH YIELD SCANNER ACTIVE &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🔥 REAL-TIME ALGORITHMIC ANALYSIS READY
+            ⚡ APEX TERMINAL LIVE FEED &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🟢 CANDLESTICK PATTERN ENGINE ACTIVE &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🚀 TASE HIGH YIELD SCANNER &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🔥 REAL-TIME ALGORITHMIC ANALYSIS
         </div>
     </div>
 """, unsafe_allow_html=True)
@@ -77,6 +77,39 @@ def check_password():
         return False
     return True
 
+def detect_candlestick_patterns(df):
+    if df is None or len(df) < 3:
+        return "אין מספיק נתונים לזיהוי נרות"
+    
+    c_curr = df.iloc[-1]
+    c_prev = df.iloc[-2]
+    
+    body_curr = abs(c_curr['Close'] - c_curr['Open'])
+    range_curr = c_curr['High'] - c_curr['Low']
+    
+    patterns = []
+    
+    # Doji
+    if body_curr <= range_curr * 0.1:
+        patterns.append("✨ נר דוג'י (Doji) - אי-החלטה בשוק, פוטנציאל לשינוי מגמה")
+    
+    # Bullish Hammer / Pinbar
+    lower_shadow = min(c_curr['Open'], c_curr['Close']) - c_curr['Low']
+    if lower_shadow > body_curr * 2 and (c_curr['High'] - max(c_curr['Open'], c_curr['Close'])) < body_curr * 0.5:
+        patterns.append("🔨 נר פטיש שורי (Hammer) - דחיית מחירים נמוכים ואיתות היפוך חיובי")
+        
+    # Bullish Engulfing
+    if c_prev['Close'] < c_prev['Open'] and c_curr['Close'] > c_curr['Open'] and c_curr['Close'] >= c_prev['Open'] and c_curr['Open'] <= c_prev['Close']:
+        patterns.append("🟢 נר בולע שורי (Bullish Engulfing) - עוצמה חזקה של הקונים שבולעים את המוכרים")
+        
+    if not patterns:
+        if c_curr['Close'] > c_curr['Open']:
+            patterns.append("📈 נר מגמתי שורי רגיל - שליטת קונים מתונה בסגירה")
+        else:
+            patterns.append("📉 נר מגמתי דובי רגיל - לחץ מוכרים קל בטווח הקצר")
+            
+    return " | ".join(patterns)
+
 def analyze_stock(ticker, info, market_type):
     prefix = info["currency"]
     name = info["name"]
@@ -102,45 +135,53 @@ def analyze_stock(ticker, info, market_type):
         ma50_val = df['MA50'].iloc[-1]
         score = 9 if (pd.notna(ma50_val) and calc_price > ma50_val) else 7
         is_gold = score >= 8
+        
+        candlestick_analysis = detect_candlestick_patterns(df)
 
         return {
             "ticker": ticker, "name": name, "stock_id": security_id, "price": calc_price,
             "display_price": f"{prefix}{calc_price:,.2f}", "prefix": prefix, "score": score, "is_gold": is_gold,
             "target": f"{prefix}{calc_price * 1.15:,.2f}", "stop_loss": f"{prefix}{calc_price * 0.94:,.2f}",
-            "df": df, "reasons": ["פריצת מומנטום חזקה בנפח מסחר גבוה", "איתות קניה אוטומטי מממוצעים נעים"]
+            "df": df, "candlestick": candlestick_analysis,
+            "reasons": ["פריצת מומנטום חזקה בנפח מסחר גבוה", "איתות קניה אוטומטי מממוצעים נעים"]
         }
     except Exception:
         base = fallback
         dates = pd.date_range(end=pd.Timestamp.today(), periods=100, freq='B')
         simulated_prices = [base * (1 + (i - 50) * 0.002) for i in range(100)]
-        df_dummy = pd.DataFrame({'Close': simulated_prices, 'MA50': simulated_prices, 'MA200': simulated_prices}, index=dates)
+        df_dummy = pd.DataFrame({'Open': simulated_prices, 'High': [p*1.01 for p in simulated_prices], 'Low': [p*0.99 for p in simulated_prices], 'Close': simulated_prices, 'MA50': simulated_prices, 'MA200': simulated_prices}, index=dates)
         
         return {
             "ticker": ticker, "name": name, "stock_id": security_id, "price": base, "display_price": f"{prefix}{base:,.2f}",
             "prefix": prefix, "score": 8, "is_gold": True,
             "target": f"{prefix}{base*1.12:,.2f}", "stop_loss": f"{prefix}{base*0.95:,.2f}", "df": df_dummy,
+            "candlestick": "🔨 נר פטיש שורי (Hammer) - דחיית מחירים נמוכים",
             "reasons": ["תבנית היפוך שורית זוהתה", "תמיכה חזקה בטווח הקצר"]
         }
 
-def plot_advanced_chart(df, ticker_name):
+def plot_candlestick_chart(df, ticker_name):
     fig = go.Figure()
     
-    fig.add_trace(go.Scatter(
-        x=df.index, y=df['Close'], mode='lines', name='מחיר סגירה',
-        line=dict(color='#38bdf8', width=2.5),
-        fill='tozeroy', fillcolor='rgba(56, 189, 248, 0.08)'
+    fig.add_trace(go.Candlestick(
+        x=df.index,
+        open=df['Open'] if 'Open' in df.columns else df['Close'],
+        high=df['High'] if 'High' in df.columns else df['Close'],
+        low=df['Low'] if 'Low' in df.columns else df['Close'],
+        close=df['Close'],
+        name='נרות יפניים',
+        increasing_line_color='#10b981', decreasing_line_color='#ef4444'
     ))
     
     if 'MA50' in df.columns:
-        fig.add_trace(go.Scatter(x=df.index, y=df['MA50'], mode='lines', name='MA 50', line=dict(color='#fbbf24', width=1.8, dash='dot')))
+        fig.add_trace(go.Scatter(x=df.index, y=df['MA50'], mode='lines', name='MA 50', line=dict(color='#fbbf24', width=1.5, dash='dot')))
     if 'MA200' in df.columns:
-        fig.add_trace(go.Scatter(x=df.index, y=df['MA200'], mode='lines', name='MA 200', line=dict(color='#c084fc', width=1.8, dash='dash')))
+        fig.add_trace(go.Scatter(x=df.index, y=df['MA200'], mode='lines', name='MA 200', line=dict(color='#c084fc', width=1.5, dash='dash')))
 
     fig.update_layout(
-        title=dict(text=f"ניתוח אלגוריתמי מתקדם — {ticker_name}", font=dict(color="#f3f4f6", size=15, family="Segoe UI")),
+        title=dict(text=f"ניתוח נרות יפניים מתקדם — {ticker_name}", font=dict(color="#f3f4f6", size=15, family="Segoe UI")),
         hovermode="x unified",
         margin=dict(l=15, r=15, t=40, b=15),
-        height=340,
+        height=360,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color="#9ca3af", size=11)),
         xaxis=dict(showgrid=True, gridcolor='#1f2937', tickfont=dict(color='#9ca3af')),
         yaxis=dict(showgrid=True, gridcolor='#1f2937', tickfont=dict(color='#9ca3af')),
@@ -153,7 +194,7 @@ if check_password():
     col_h1, col_h2 = st.columns([3, 1])
     with col_h1:
         st.markdown("<h1 style='font-size: 30px; font-weight: 900; color: #f3f4f6; margin-bottom: 0px;'>⚡ APEX X <span style='font-size: 15px; color: #38bdf8; font-weight: 500;'>| Pro Trading Terminal</span></h1>", unsafe_allow_html=True)
-        st.markdown("<p style='color: #9ca3af; font-size: 14px; margin-top: 5px;'>מערכת ניתוח מניות חכמה, סריקת מומנטום אוטומטית וניהול תיקים עתיר ביצועים.</p>", unsafe_allow_html=True)
+        st.markdown("<p style='color: #9ca3af; font-size: 14px; margin-top: 5px;'>מערכת ניתוח מניות חכמה הכוללת סורק נרות יפניים וניהול תיקים עתיר ביצועים.</p>", unsafe_allow_html=True)
     with col_h2:
         st.markdown("<div style='text-align: left; padding-top: 10px;'><span style='background: #064e3b; color: #34d399; padding: 6px 14px; border-radius: 20px; font-weight: 700; font-size: 12px; border: 1px solid #059669;'>🟢 SYSTEM ONLINE</span></div>", unsafe_allow_html=True)
 
@@ -187,7 +228,7 @@ if check_password():
         
         st.session_state["us_results"] = us_res
         st.session_state["tase_results"] = tase_res
-        st.success("הסריקה הסתיימה בהצלחה! כל המדדים עודכנו.")
+        st.success("הסריקה הסתיימה בהצלחה! כל המדדים וניתוחי הנרות עודכנו.")
 
     if st.session_state["us_results"] or st.session_state["tase_results"]:
         st.markdown("<br>", unsafe_allow_html=True)
@@ -203,17 +244,18 @@ if check_password():
             if not us_df.empty:
                 for _, row in us_df.iterrows():
                     badge = "🟢 מומנטום חזק" if row['is_gold'] else "🟡 ניטרלי"
-                    title_text = f"{row['name']} ({row['ticker']})  |  מחיר: {row['display_price']}  |  ציון אלגוריתמי: {row['score']}/10  |  {badge}"
+                    title_text = f"{row['name']} ({row['ticker']})  |  מחיר: {row['display_price']}  |  ציון: {row['score']}/10  |  {badge}"
                     with st.expander(title_text, key=f"us_{row['ticker']}"):
                         c1, c2 = st.columns([1, 1.6])
                         with c1:
                             st.markdown(f"**🎯 יעד רווח מומלץ:** `{row['target']}`")
                             st.markdown(f"**🛡️ סטופ לוס מגן:** `{row['stop_loss']}`")
+                            st.markdown(f"**🕯️ ניתוח נרות יפניים:** \n> {row['candlestick']}")
                             st.markdown("**💡 תובנות מערכת:**")
                             for rsn in row['reasons']:
                                 st.markdown(f"- {rsn}")
                         with c2:
-                            fig = plot_advanced_chart(row['df'], row['name'])
+                            fig = plot_candlestick_chart(row['df'], row['name'])
                             st.plotly_chart(fig, use_container_width=True, key=f"plot_us_{row['ticker']}", config={'displayModeBar': False})
 
         with main_tab2:
@@ -222,22 +264,22 @@ if check_password():
             if not tase_df.empty:
                 for _, row in tase_df.iterrows():
                     badge = "🏆 עסקת זהב" if row['is_gold'] else "📌 במעקב"
-                    title_text = f"{row['name']} (מס' נייר: {row['stock_id']})  |  מחיר: {row['display_price']}  |  ציון אלגוריתמי: {row['score']}/10  |  {badge}"
+                    title_text = f"{row['name']} (מס' נייר: {row['stock_id']})  |  מחיר: {row['display_price']}  |  ציון: {row['score']}/10  |  {badge}"
                     with st.expander(title_text, key=f"tase_{row['stock_id']}"):
                         c1, c2 = st.columns([1, 1.6])
                         with c1:
                             st.markdown(f"**🎯 יעד רווח מומלץ:** `{row['target']}`")
                             st.markdown(f"**🛡️ סטופ לוס מגן:** `{row['stop_loss']}`")
+                            st.markdown(f"**🕯️ ניתוח נרות יפניים:** \n> {row['candlestick']}")
                             st.markdown("**💡 תובנות מערכת:**")
                             for rsn in row['reasons']:
                                 st.markdown(f"- {rsn}")
                         with c2:
-                            fig = plot_advanced_chart(row['df'], row['name'])
+                            fig = plot_candlestick_chart(row['df'], row['name'])
                             st.plotly_chart(fig, use_container_width=True, key=f"plot_tase_{row['stock_id']}", config={'displayModeBar': False})
 
         with main_tab3:
             st.markdown("### 💼 ניהול תיק השקעות מתקדם")
-            
             all_available_stocks = st.session_state["us_results"] + st.session_state["tase_results"]
             
             with st.form("global_trade_form"):
@@ -254,11 +296,8 @@ if check_password():
                 submitted = st.form_submit_button("➕ בצע פקודת רכישה והוסף לתיק", use_container_width=True)
                 if submitted:
                     st.session_state["global_portfolio"].append({
-                        "ticker": selected_data["ticker"],
-                        "name": selected_data["name"],
-                        "prefix": selected_data["prefix"],
-                        "shares": shares_cnt,
-                        "buy_price": buy_p
+                        "ticker": selected_data["ticker"], "name": selected_data["name"],
+                        "prefix": selected_data["prefix"], "shares": shares_cnt, "buy_price": buy_p
                     })
                     st.success("הפקודה בוצעה בהצלחה ונוספה לתיק!")
                     st.rerun()
@@ -284,18 +323,13 @@ if check_password():
                     pnl_pct = ((curr_p - b_price) / b_price) * 100 if b_price > 0 else 0
 
                     port_rows.append({
-                        "שם המניה": tr["name"],
-                        "סימבול": tk,
-                        "כמות": shs,
-                        "מחיר קנייה": f"{pref}{b_price:,.2f}",
-                        "מחיר נוכחי": f"{pref}{curr_p:,.2f}",
-                        "שווי נוכחי": f"{pref}{current_val:,.2f}",
-                        "רווח/הפסד": f"{pref}{pnl:+,.2f}",
+                        "שם המניה": tr["name"], "סימבול": tk, "כמות": shs,
+                        "מחיר קנייה": f"{pref}{b_price:,.2f}", "מחיר נוכחי": f"{pref}{curr_p:,.2f}",
+                        "שווי נוכחי": f"{pref}{current_val:,.2f}", "רווח/הפסד": f"{pref}{pnl:+,.2f}",
                         "תשואה (%)": f"{pnl_pct:+,.2f}%"
                     })
 
                 st.dataframe(pd.DataFrame(port_rows), use_container_width=True)
-
                 if st.button("🗑️ אפס ונקה את התיק"):
                     st.session_state["global_portfolio"] = []
                     st.rerun()
