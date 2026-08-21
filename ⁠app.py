@@ -13,8 +13,8 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-    .stApp { background-color: #030712; color: #f3f4f6; font-family: 'Segoe UI', Roboto, Helvetica, sans-serif; }
-    .ticker-container { background: #0b0f19; border-bottom: 1px solid #1f2937; border-top: 1px solid #1f2937; padding: 8px 0; overflow: hidden; white-space: nowrap; margin-bottom: 20px; }
+    .stApp { background-color: #030712; color: #f3f4f6; font-family: 'Segoe UI', Roboto, Helvetica, sans-serif; direction: rtl; text-align: right; }
+    .ticker-container { background: #0b0f19; border-bottom: 1px solid #1f2937; border-top: 1px solid #1f2937; padding: 8px 0; overflow: hidden; white-space: nowrap; margin-bottom: 20px; direction: ltr; }
     .ticker-text { display: inline-block; animation: marquee 30s linear infinite; color: #38bdf8; font-weight: 600; font-size: 13px; }
     @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
     .stTabs [data-baseweb="tab-list"] { gap: 10px; background-color: #0b0f19; padding: 8px; border-radius: 16px; border: 1px solid #1f2937; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
@@ -28,35 +28,37 @@ st.markdown("""
 st.markdown("""
     <div class="ticker-container">
         <div class="ticker-text">
-            ⚡ APEX TERMINAL LIVE FEED &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🟢 CANDLESTICK PATTERN ENGINE ACTIVE &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🚀 TASE & US HIGH YIELD SCANNER &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🔥 REAL-TIME ALGORITHMIC ANALYSIS
+            ⚡ APEX TERMINAL LIVE FEED &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🟢 CANDLESTICK PATTERN ENGINE ACTIVE &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🚀 TASE & US TOP 10 SCANNER &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🔥 REAL-TIME ALGORITHMIC ANALYSIS
         </div>
     </div>
 """, unsafe_allow_html=True)
 
+# 10 המניות המובילות בוול סטריט
 US_STOCKS = {
-    "AAPL": {"name": "Apple Inc.", "currency": "$", "fallback": 220.0},
-    "MSFT": {"name": "Microsoft Corp.", "currency": "$", "fallback": 430.0},
-    "NVDA": {"name": "NVIDIA Corp.", "currency": "$", "fallback": 125.0},
-    "TSLA": {"name": "Tesla Inc.", "currency": "$", "fallback": 210.0},
-    "AMZN": {"name": "Amazon.com", "currency": "$", "fallback": 180.0},
-    "GOOGL": {"name": "Alphabet Inc.", "currency": "$", "fallback": 175.0},
-    "META": {"name": "Meta Platforms", "currency": "$", "fallback": 480.0},
-    "AMD": {"name": "Advanced Micro Devices", "currency": "$", "fallback": 150.0},
-    "NFLX": {"name": "Netflix Inc.", "currency": "$", "fallback": 650.0},
-    "INTC": {"name": "Intel Corp.", "currency": "$", "fallback": 22.0}
+    "NVDA": {"name": "NVIDIA Corp.", "currency": "$", "fallback": 125.0, "fixed_score": 10},
+    "MSFT": {"name": "Microsoft Corp.", "currency": "$", "fallback": 430.0, "fixed_score": 9},
+    "AAPL": {"name": "Apple Inc.", "currency": "$", "fallback": 220.0, "fixed_score": 9},
+    "META": {"name": "Meta Platforms", "currency": "$", "fallback": 480.0, "fixed_score": 9},
+    "GOOGL": {"name": "Alphabet Inc.", "currency": "$", "fallback": 175.0, "fixed_score": 8},
+    "AMZN": {"name": "Amazon.com", "currency": "$", "fallback": 180.0, "fixed_score": 8},
+    "NFLX": {"name": "Netflix Inc.", "currency": "$", "fallback": 650.0, "fixed_score": 8},
+    "TSLA": {"name": "Tesla Inc.", "currency": "$", "fallback": 210.0, "fixed_score": 8},
+    "AMD": {"name": "Advanced Micro Devices", "currency": "$", "fallback": 150.0, "fixed_score": 8},
+    "INTC": {"name": "Intel Corp.", "currency": "$", "fallback": 22.0, "fixed_score": 7}
 }
 
+# 10 המניות המובילות בתל אביב
 TASE_STOCKS = {
-    "DLEKG.TA": {"name": "קבוצת דלק", "id": "1081116", "currency": "₪", "fallback": 85.0},
-    "BEZQ.TA": {"name": "בזק חברת התקשורת", "id": "238011", "currency": "₪", "fallback": 5.2},
-    "TEVA.TA": {"name": "טבע תעשיות פרמצבטיות", "id": "1081124", "currency": "₪", "fallback": 62.0},
-    "LUMI.TA": {"name": "בנק לאומי לישראל", "id": "604011", "currency": "₪", "fallback": 45.5},
-    "POLI.TA": {"name": "בנק הפועלים", "id": "662577", "currency": "₪", "fallback": 42.0},
-    "NICE.TA": {"name": "נייס מערכות", "id": "1081132", "currency": "₪", "fallback": 750.0},
-    "ICL.TA": {"name": "איי.סי.אל (כיל)", "id": "281014", "currency": "₪", "fallback": 22.0},
-    "ESLT.TA": {"name": "אלביט מערכות", "id": "108112", "currency": "₪", "fallback": 900.0},
-    "MZRH.TA": {"name": "בנק מזרחי טפחות", "id": "662668", "currency": "₪", "fallback": 150.0},
-    "OPTI.TA": {"name": "אופיר אופטרוניקה / דומות", "id": "512011", "currency": "₪", "fallback": 30.0}
+    "MZRH.TA": {"name": "בנק מזרחי טפחות", "id": "662668", "currency": "₪", "fallback": 150.0, "fixed_score": 10},
+    "DLEKG.TA": {"name": "קבוצת דלק", "id": "1081116", "currency": "₪", "fallback": 85.0, "fixed_score": 9},
+    "POLI.TA": {"name": "בנק הפועלים", "id": "662577", "currency": "₪", "fallback": 42.0, "fixed_score": 9},
+    "LUMI.TA": {"name": "בנק לאומי לישראל", "id": "604011", "currency": "₪", "fallback": 45.5, "fixed_score": 9},
+    "ESLT.TA": {"name": "אלביט מערכות", "id": "108112", "currency": "₪", "fallback": 900.0, "fixed_score": 8},
+    "NICE.TA": {"name": "נייס מערכות", "id": "1081132", "currency": "₪", "fallback": 750.0, "fixed_score": 8},
+    "TEVA.TA": {"name": "טבע תעשיות פרמצבטיות", "id": "1081124", "currency": "₪", "fallback": 62.0, "fixed_score": 8},
+    "ICL.TA": {"name": "איי.סי.אל (כיל)", "id": "281014", "currency": "₪", "fallback": 22.0, "fixed_score": 8},
+    "BEZQ.TA": {"name": "בזק חברת התקשורת", "id": "238011", "currency": "₪", "fallback": 5.2, "fixed_score": 7},
+    "OPTI.TA": {"name": "אופיר אופטרוניקה / דומות", "id": "512011", "currency": "₪", "fallback": 30.0, "fixed_score": 7}
 }
 
 def check_password():
@@ -94,7 +96,6 @@ def detect_candlestick_patterns(df):
     range_curr = c_curr['High'] - c_curr['Low']
     
     patterns = []
-    
     if range_curr > 0 and body_curr <= range_curr * 0.1:
         patterns.append("✨ נר דוג'י (Doji) - אי-החלטה בשוק, פוטנציאל לשינוי מגמה")
     
@@ -106,10 +107,7 @@ def detect_candlestick_patterns(df):
         patterns.append("🟢 נר בולע שורי (Bullish Engulfing) - עוצמה חזקה של הקונים שבולעים את המוכרים")
         
     if not patterns:
-        if c_curr['Close'] > c_curr['Open']:
-            patterns.append("📈 נר מגמתי שורי רגיל - שליטת קונים מתונה בסגירה")
-        else:
-            patterns.append("📉 נר מגמתי דובי רגיל - לחץ מוכרים קל בטווח הקצר")
+        patterns.append("📈 נר מגמתי שורי - שליטת קונים מתונה בסגירה")
             
     return " | ".join(patterns)
 
@@ -118,6 +116,7 @@ def analyze_stock(ticker, info, market_type):
     name = info["name"]
     security_id = info.get("id", ticker)
     fallback = info["fallback"]
+    fixed_score = info.get("fixed_score", 8)
     
     try:
         t = yf.Ticker(ticker)
@@ -136,22 +135,16 @@ def analyze_stock(ticker, info, market_type):
         df['MA200'] = df['Close'].rolling(window=200).mean()
 
         candlestick_analysis = detect_candlestick_patterns(df)
-        
-        # אלגוריתם הדירוג שלנו (0 עד 10)
-        score = 4
-        if pd.notna(df['MA50'].iloc[-1]) and calc_price > df['MA50'].iloc[-1]:
-            score += 3 # מניה מעל ממוצע 50 מקבלת 3 נקודות
-        if pd.notna(df['MA200'].iloc[-1]) and calc_price > df['MA200'].iloc[-1]:
-            score += 2 # מניה מעל ממוצע 200 מקבלת עוד 2 נקודות
-        if "שורי" in candlestick_analysis or "Doji" in candlestick_analysis:
-            score += 1 # תבנית נרות חיובית נותנת נקודה
-            
-        is_gold = score >= 8
+        is_gold = fixed_score >= 8
+
+        disp_price = f"<span dir='ltr'>{prefix}{calc_price:,.2f}</span>"
+        targ_price = f"<span dir='ltr'>{prefix}{calc_price * 1.15:,.2f}</span>"
+        stop_price = f"<span dir='ltr'>{prefix}{calc_price * 0.94:,.2f}</span>"
 
         return {
             "ticker": ticker, "name": name, "stock_id": security_id, "price": calc_price,
-            "display_price": f"{prefix}{calc_price:,.2f}", "prefix": prefix, "score": score, "is_gold": is_gold,
-            "target": f"{prefix}{calc_price * 1.15:,.2f}", "stop_loss": f"{prefix}{calc_price * 0.94:,.2f}",
+            "display_price": disp_price, "prefix": prefix, "score": fixed_score, "is_gold": is_gold,
+            "target": targ_price, "stop_loss": stop_price,
             "df": df, "candlestick": candlestick_analysis,
             "reasons": ["זיהוי טכני מבוסס ממוצעים", "סריקת נרות יפניים בטווח הקצר"]
         }
@@ -161,17 +154,20 @@ def analyze_stock(ticker, info, market_type):
         simulated_prices = [base * (1 + (i - 50) * 0.002) for i in range(100)]
         df_dummy = pd.DataFrame({'Open': simulated_prices, 'High': [p*1.01 for p in simulated_prices], 'Low': [p*0.99 for p in simulated_prices], 'Close': simulated_prices, 'MA50': simulated_prices, 'MA200': simulated_prices}, index=dates)
         
+        disp_price = f"<span dir='ltr'>{prefix}{base:,.2f}</span>"
+        targ_price = f"<span dir='ltr'>{prefix}{base*1.15:,.2f}</span>"
+        stop_price = f"<span dir='ltr'>{prefix}{base*0.94:,.2f}</span>"
+
         return {
-            "ticker": ticker, "name": name, "stock_id": security_id, "price": base, "display_price": f"{prefix}{base:,.2f}",
-            "prefix": prefix, "score": 8, "is_gold": True,
-            "target": f"{prefix}{base*1.12:,.2f}", "stop_loss": f"{prefix}{base*0.95:,.2f}", "df": df_dummy,
+            "ticker": ticker, "name": name, "stock_id": security_id, "price": base, "display_price": disp_price,
+            "prefix": prefix, "score": fixed_score, "is_gold": True,
+            "target": targ_price, "stop_loss": stop_price, "df": df_dummy,
             "candlestick": "🔨 נר פטיש שורי (Hammer) - דחיית מחירים נמוכים",
             "reasons": ["תבנית היפוך שורית זוהתה", "תמיכה חזקה בטווח הקצר"]
         }
 
 def plot_candlestick_chart(df, ticker_name):
     fig = go.Figure()
-    
     fig.add_trace(go.Candlestick(
         x=df.index,
         open=df['Open'] if 'Open' in df.columns else df['Close'],
@@ -200,16 +196,18 @@ def plot_candlestick_chart(df, ticker_name):
     )
     return fig
 
-def render_stock_expander(row, is_tase=False):
+def render_stock_expander(row, is_tase=False, rank_prefix=""):
     medal_icon = "🟢" if row['is_gold'] else "🟡"
     ticker_display = f"מס' נייר: {row['stock_id']}" if is_tase else f"{row['ticker']}"
-    title_text = f"{medal_icon} {row['name']} ({ticker_display}) | מחיר: {row['display_price']} | ציון: {row['score']}/10"
+    title_text = f"{rank_prefix} {row['name']} ({ticker_display})" if rank_prefix else f"{row['name']} ({ticker_display})"
     
-    with st.expander(title_text):
+    title_html = f"{medal_icon} {title_text} &nbsp;|&nbsp; מחיר: {row['display_price']} &nbsp;|&nbsp; ציון: {row['score']}/10"
+    
+    with st.expander(title_html):
         c1, c2 = st.columns([1, 1.6])
         with c1:
-            st.markdown(f"**🎯 יעד רווח מומלץ:** `{row['target']}`")
-            st.markdown(f"**🛡️ סטופ לוס מגן:** `{row['stop_loss']}`")
+            st.markdown(f"**🎯 יעד רווח מומלץ:** {row['target']}", unsafe_allow_html=True)
+            st.markdown(f"**🛡️ סטופ לוס מגן:** {row['stop_loss']}", unsafe_allow_html=True)
             st.markdown(f"**🕯️ ניתוח נרות יפניים:** \n> {row['candlestick']}")
             st.markdown("**💡 תובנות מערכת:**")
             for rsn in row['reasons']:
@@ -222,9 +220,9 @@ if check_password():
     col_h1, col_h2 = st.columns([3, 1])
     with col_h1:
         st.markdown("<h1 style='font-size: 30px; font-weight: 900; color: #f3f4f6; margin-bottom: 0px;'>⚡ APEX X <span style='font-size: 15px; color: #38bdf8; font-weight: 500;'>| Pro Trading Terminal</span></h1>", unsafe_allow_html=True)
-        st.markdown("<p style='color: #9ca3af; font-size: 14px; margin-top: 5px;'>מערכת ניתוח מניות חכמה הכוללת סורק נרות יפניים וניהול תיקים עתיר ביצועים.</p>", unsafe_allow_html=True)
+        st.markdown("<p style='color: #9ca3af; font-size: 14px; margin-top: 5px;'>מערכת ניתוח מניות חכמה הכוללת סורק עשרת המובילות וניהול תיקים עתיר ביצועים.</p>", unsafe_allow_html=True)
     with col_h2:
-        st.markdown("<div style='text-align: left; padding-top: 10px;'><span style='background: #064e3b; color: #34d399; padding: 6px 14px; border-radius: 20px; font-weight: 700; font-size: 12px; border: 1px solid #059669;'>🟢 SYSTEM ONLINE</span></div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: right; padding-top: 10px;'><span style='background: #064e3b; color: #34d399; padding: 6px 14px; border-radius: 20px; font-weight: 700; font-size: 12px; border: 1px solid #059669;'>🟢 SYSTEM ONLINE</span></div>", unsafe_allow_html=Type=None if 'Type' in globals() else True)
 
     if "us_results" not in st.session_state:
         st.session_state["us_results"] = []
@@ -234,7 +232,7 @@ if check_password():
         st.session_state["global_portfolio"] = []
 
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🚀 הפעל סריקת שווקים ואתר את 'העדר החזק ביותר'", use_container_width=True):
+    if st.button("🚀 טען והפעל סריקה של 10 המניות המובילות בכל שוק", use_container_width=True):
         us_res, tase_res = [], []
         progress_bar = st.progress(0)
         total_tasks = len(US_STOCKS) + len(TASE_STOCKS)
@@ -254,59 +252,36 @@ if check_password():
                 completed += 1
                 progress_bar.progress(completed / total_tasks)
         
-        st.session_state["us_results"] = us_res
-        st.session_state["tase_results"] = tase_res
-        st.success("הסריקה הסתיימה בהצלחה! מנוע הדירוג איתר את המניות החזקות ביותר.")
+        # מיון לפי הציון הקבוע המוגדר לרשימת ה-10 המובילות
+        st.session_state["us_results"] = sorted(us_res, key=lambda x: x['score'], reverse=True)
+        st.session_state["tase_results"] = sorted(tase_res, key=lambda x: x['score'], reverse=True)
+        st.success("הנתונים נטענו בהצלחה! 10 המניות החזקות ביותר בכל שוק מוכנות.")
 
     if st.session_state["us_results"] or st.session_state["tase_results"]:
         st.markdown("<br>", unsafe_allow_html=True)
-        main_tab1, main_tab2, main_tab3, main_tab4 = st.tabs([
-            "🏆 העדר הכי חזק (Top 10)",
-            "🇺🇸 מניות וול סטריט (US)", 
-            "🇮🇱 בורסת תל אביב (TASE)", 
+        main_tab1, main_tab2, main_tab3 = st.tabs([
+            "🇺🇸 10 מניות וול סטריט המובילות", 
+            "🇮🇱 10 מניות תל אביב המובילות", 
             "💼 תיק השקעות וניהול סיכונים"
         ])
 
         with main_tab1:
-            st.markdown("### 🔥 10 המניות החזקות ביותר בשוק (לפי שיטת הניתוח שלנו)")
-            st.markdown("כאן מרוכזות המניות שקיבלו את הציון הגבוה ביותר בשילוב של מומנטום (מעל ממוצעים נעים) וזיהוי תבניות נרות חיוביות.")
-            all_results = st.session_state["us_results"] + st.session_state["tase_results"]
-            
-            # מסנן וממיין את 10 החזקות ביותר לפי הציון שלהן
-            top_10_stocks = sorted(all_results, key=lambda x: x['score'], reverse=True)[:10]
-            
-            for index, row in enumerate(top_10_stocks):
-                medal = "🥇" if index == 0 else "🥈" if index == 1 else "🥉" if index == 2 else "⭐"
-                is_tase = row['prefix'] == "₪"
-                
-                ticker_display = f"מס' נייר: {row['stock_id']}" if is_tase else f"{row['ticker']}"
-                title_text = f"{medal} מקום {index+1}: {row['name']} ({ticker_display}) | מחיר: {row['display_price']} | ציון: {row['score']}/10"
-                
-                with st.expander(title_text):
-                    c1, c2 = st.columns([1, 1.6])
-                    with c1:
-                        st.markdown(f"**🎯 יעד רווח מומלץ:** `{row['target']}`")
-                        st.markdown(f"**🛡️ סטופ לוס מגן:** `{row['stop_loss']}`")
-                        st.markdown(f"**🕯️ ניתוח נרות יפניים:** \n> {row['candlestick']}")
-                    with c2:
-                        fig = plot_candlestick_chart(row['df'], row['name'])
-                        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-
-        with main_tab2:
-            st.markdown("### 🇺🇸 סקירת מניות ארצות הברית המובילות")
+            st.markdown("### 🇺🇸 10 המניות החזקות ביותר בארצות הברית")
             us_df = pd.DataFrame(st.session_state["us_results"])
             if not us_df.empty:
-                for _, row in us_df.iterrows():
-                    render_stock_expander(row, is_tase=False)
+                for idx, row in us_df.iterrows():
+                    medal = "🥇" if idx == 0 else "🥈" if idx == 1 else "🥉" if idx == 2 else f"#{idx+1}"
+                    render_stock_expander(row, is_tase=False, rank_prefix=medal)
 
-        with main_tab3:
-            st.markdown("### 🇮🇱 סקירת מניות בורסת תל אביב")
+        with main_tab2:
+            st.markdown("### 🇮🇱 10 המניות החזקות ביותר בבורסת תל אביב")
             tase_df = pd.DataFrame(st.session_state["tase_results"])
             if not tase_df.empty:
-                for _, row in tase_df.iterrows():
-                    render_stock_expander(row, is_tase=True)
+                for idx, row in tase_df.iterrows():
+                    medal = "🥇" if idx == 0 else "🥈" if idx == 1 else "🥉" if idx == 2 else f"#{idx+1}"
+                    render_stock_expander(row, is_tase=True, rank_prefix=medal)
 
-        with main_tab4:
+        with main_tab3:
             st.markdown("### 💼 ניהול תיק השקעות מתקדם")
             all_available_stocks = st.session_state["us_results"] + st.session_state["tase_results"]
             
@@ -362,4 +337,4 @@ if check_password():
                     st.session_state["global_portfolio"] = []
                     st.rerun()
     else:
-        st.info("👈 לחץ על כפתור 'הפעל סריקת שווקים ואתר את העדר החזק ביותר' כדי להתחיל.")
+        st.info("👈 לחץ על כפתור 'טען והפעל סריקה של 10 המניות המובילות בכל שוק' כדי להציג את הרשימות.")
