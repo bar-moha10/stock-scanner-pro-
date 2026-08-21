@@ -70,19 +70,21 @@ def analyze_stock(ticker):
     try:
         t = yf.Ticker(ticker)
         df = t.history(period="6mo", auto_adjust=True)
-        if df.empty or len(df) < 10:
+        if df.empty or len(df) < 5:
             dates = pd.date_range(end=pd.Timestamp.today(), periods=100, freq='B')
             base = 100.0 if not is_israeli else 3500.0
             df = pd.DataFrame({'Close': [base]*100, 'Open': [base]*100, 'High': [base*1.01]*100, 'Low': [base*0.99]*100, 'Volume': [10000]*100}, index=dates)
 
         raw_price = float(df['Close'].iloc[-1])
+        if pd.isna(raw_price):
+            raw_price = 50.0
+
         if is_israeli and raw_price > 200:
             df[['Open', 'High', 'Low', 'Close']] = df[['Open', 'High', 'Low', 'Close']] / 100.0
             calc_price = raw_price / 100.0
         else:
             calc_price = raw_price
 
-        # חישוב ממוצעים נעים אמיתיים
         df['MA50'] = df['Close'].rolling(window=50).mean()
         df['MA200'] = df['Close'].rolling(window=200).mean()
 
@@ -103,7 +105,6 @@ def analyze_stock(ticker):
             "rvol": "1.35x",
             "target": f"{prefix}{calc_price * 1.12:.2f}",
             "stop_loss": f"{prefix}{calc_price * 0.95:.2f}",
-            "potential": 12.0,
             "df": df,
             "reasons": ["מחיר מעל ממוצע נע 50", "מחזור מסחר תומך בעלייה", "מומנטום טכני חיובי"]
         }
@@ -114,10 +115,10 @@ def analyze_stock(ticker):
         return {
             "ticker": ticker, "name": info["name"], "stock_id": "לא ידוע", "price": base, "display_price": f"{prefix}{base:.2f}",
             "prefix": prefix, "score": 6, "is_gold": False, "rsi": 50.0, "rvol": "1.0x",
-            "target": f"{prefix}{base*1.1:.2f}", "stop_loss": f"{prefix}{base*0.95:.2f}", "potential": 10.0, "df": df_dummy, "reasons": ["נתונים בסיסיים"]
+            "target": f"{prefix}{base*1.1:.2f}", "stop_loss": f"{prefix}{base*0.95:.2f}", "df": df_dummy, "reasons": ["נתונים בסיסיים"]
         }
 
-def plot_chart_with_mas(df, ticker, prefix):
+def plot_chart_with_mas(df, ticker):
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', name='מחיר סגירה', line=dict(color='#00d2ff', width=2)))
     if 'MA50' in df.columns:
@@ -140,7 +141,6 @@ def plot_chart_with_mas(df, ticker, prefix):
 if check_password():
     st.title("📈 Stock Scanner Pro — המרכז הפיננסי המתקדם")
 
-    # אזור הסברים אינטראקטיביים מקיף
     with st.expander("📖 מדריך הסברים אינטראקטיבי למערכת (לחץ לפתיחה)"):
         st.markdown("""
         * **🏆 עסקאות זהב (Top):** המניות שנבחרו בקפדנות על פי עוצמה טכנית, ממוצעים נעים חיוביים ונפח מסחר תומך.
@@ -148,7 +148,6 @@ if check_password():
         * **ממוצע נע 200 (MA200 - קו סגול מקווקו):** מציין את המגמה ארוכת הטווח. מחיר מעל קו זה מעיד על מבנה שוק חיובי.
         * **RSI (מדד עוצמה יחסית):** בוחן האם המניה קרובה למצבי קיצון של קניית-יתר או מכירת-יתר.
         * **RVOL (נפח יחסי):** משווה את מחזור המסחר הנוכחי לממוצע כדי לאתר עניין חריג מצד המשקיעים.
-        * **סטופ לוס / יעד:** נקודות ניהול הסיכונים המומלצות לכל טרייד.
         """)
 
     if "results" not in st.session_state:
@@ -186,46 +185,49 @@ if check_password():
         with tab_gold:
             st.subheader("🏆 הזדמנויות הזהב המובילות בשוק (כולל ממוצעים נעים)")
             gold_stocks = df_res[df_res["is_gold"] == True]
-            for _, row in gold_stocks.iterrows():
-                with st.expander(f"🏆 {row['name']} ({row['ticker']}) — ציון: {row['score']}/10"):
-                    c1, c2 = st.columns([1, 1.5])
-                    with c1:
-                        st.markdown(f"**מחיר נוכחי:** {row['display_price']}")
-                        st.markdown(f"**מחיר יעד:** {row['target']}")
-                        st.markdown(f"**סטופ לוס:** {row['stop_loss']}")
-                        st.markdown(f"**RVOL:** {row['rvol']} | **RSI:** {row['rsi']}")
-                        st.info("ניתוח טכני: " + " | ".join(row['reasons']))
-                    with c2:
-                        fig = plot_chart_with_mas(row['df'], row['ticker'], row['prefix'])
-                        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+            if gold_stocks.empty:
+                st.info("אין כרגע מניות העונות לקריטריוני הזהב המחמירים בסריקה האחרונה.")
+            else:
+                for idx, row in gold_stocks.iterrows():
+                    with st.expander(f"🏆 {row['name']} ({row['ticker']}) — מחיר: {row['display_price']} | ציון: {row['score']}/10", key=f"gold_{row['ticker']}"):
+                        c1, c2 = st.columns([1, 1.5])
+                        with c1:
+                            st.markdown(f"**מחיר נוכחי:** {row['display_price']}")
+                            st.markdown(f"**מחיר יעד:** {row['target']}")
+                            st.markdown(f"**סטופ לוס:** {row['stop_loss']}")
+                            st.markdown(f"**RVOL:** {row['rvol']} | **RSI:** {row['rsi']}")
+                            st.info("ניתוח טכני: " + " | ".join(row['reasons']))
+                        with c2:
+                            fig = plot_chart_with_mas(row['df'], row['ticker'])
+                            st.plotly_chart(fig, use_container_width=True, key=f"plot_gold_{row['ticker']}", config={'displayModeBar': False})
 
         with tab_il:
             st.subheader("🇮🇱 מניות הבורסה בתל אביב")
             il_stocks = df_res[df_res["ticker"].str.endswith(".TA")]
-            for _, row in il_stocks.iterrows():
-                with st.expander(f"📌 {row['name']} ({row['stock_id']} / {row['ticker']}) — מחיר: {row['display_price']}"):
+            for idx, row in il_stocks.iterrows():
+                with st.expander(f"📌 {row['name']} ({row['stock_id']} / {row['ticker']}) — מחיר: {row['display_price']}", key=f"il_{row['ticker']}"):
                     c1, c2 = st.columns([1, 1.5])
                     with c1:
                         st.markdown(f"**ציון מערכת:** {row['score']}/10")
                         st.markdown(f"**יעד רווח:** {row['target']}")
                         st.markdown(f"**סטופ לוס:** {row['stop_loss']}")
                     with c2:
-                        fig = plot_chart_with_mas(row['df'], row['ticker'], row['prefix'])
-                        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+                        fig = plot_chart_with_mas(row['df'], row['ticker'])
+                        st.plotly_chart(fig, use_container_width=True, key=f"plot_il_{row['ticker']}", config={'displayModeBar': False})
 
         with tab_us:
             st.subheader("🇺🇸 מניות ארה\"ב")
             us_stocks = df_res[~df_res["ticker"].str.endswith(".TA")]
-            for _, row in us_stocks.iterrows():
-                with st.expander(f"📌 {row['ticker']} — מחיר: {row['display_price']}"):
+            for idx, row in us_stocks.iterrows():
+                with st.expander(f"📌 {row['ticker']} — מחיר: {row['display_price']}", key=f"us_{row['ticker']}"):
                     c1, c2 = st.columns([1, 1.5])
                     with c1:
                         st.markdown(f"**ציון מערכת:** {row['score']}/10")
                         st.markdown(f"**יעד רווח:** {row['target']}")
                         st.markdown(f"**סטופ לוס:** {row['stop_loss']}")
                     with c2:
-                        fig = plot_chart_with_mas(row['df'], row['ticker'], row['prefix'])
-                        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+                        fig = plot_chart_with_mas(row['df'], row['ticker'])
+                        st.plotly_chart(fig, use_container_width=True, key=f"plot_us_{row['ticker']}", config={'displayModeBar': False})
 
         with tab_port:
             st.subheader("💼 ניהול תיק השקעות וירטואלי")
