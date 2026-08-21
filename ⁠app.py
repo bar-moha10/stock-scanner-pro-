@@ -89,7 +89,8 @@ def check_password():
                 submit = st.form_submit_button("התחבר למערכת", type="primary")
                 
                 if submit:
-                    if username.strip().lower() == "shemi" and password == "yahav8122011":
+                    # שימוש ב-.strip() כדי למנוע בעיות של רווחים נסתרים בהקלדה
+                    if username.strip() == "Shemi" and password.strip() == "1234":
                         st.session_state["authenticated"] = True
                         st.rerun()
                     else:
@@ -108,7 +109,6 @@ def analyze_single_ticker(ticker):
         t = yf.Ticker(ticker)
         df = t.history(period="6mo", auto_adjust=True)
         
-        # אם הנתונים ריקים מסיבה כלשהי, ניצור דאטה-פריים דמה יציב כדי שלא נפספס את המניה
         if df.empty or len(df) < 5:
             dates = pd.date_range(end=pd.Timestamp.today(), periods=50, freq='B')
             base_p = 100.0 if not is_israeli else 3500.0
@@ -134,7 +134,6 @@ def analyze_single_ticker(ticker):
         
         ma50_val = float(df['MA50'].iloc[-1]) if len(df) >= 50 and not pd.isna(df['MA50'].iloc[-1]) else None
         
-        # חישוב ציון יציב המבוסס על נתוני המניה
         score_10 = 7 if (ma50_val and calc_price > ma50_val) else 6
         rec_title = f"✅ שורי חזק ({score_10}/10)" if score_10 >= 6 else f"🟡 ניטרלי ({score_10}/10)"
         is_golden = score_10 >= 8
@@ -160,7 +159,6 @@ def analyze_single_ticker(ticker):
             "prefix": prefix
         }
     except Exception:
-        # גיבוי מלא למקרה ששגיאת תקשורת חוסמת מניה ספציפית לחלוטין
         base_p = 35.0 if is_israeli else 100.0
         dates = pd.date_range(end=pd.Timestamp.today(), periods=50, freq='B')
         df_dummy = pd.DataFrame({
@@ -212,7 +210,7 @@ if check_password():
 
     with st.sidebar:
         st.header("⚙️ בקרת מערכת")
-        st.success("מחובר כמשתמש: **shemi**")
+        st.success("מחובר כמשתמש: **Shemi**")
         run_scan_sidebar = st.button("🚀 הפעל סריקת שוק מלאה (צד)", type="primary")
 
     st.markdown("### 🔍 התחלת עבודה")
