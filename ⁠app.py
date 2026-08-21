@@ -26,14 +26,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("""
-    <div class="ticker-container">
-        <div class="ticker-text">
-            ⚡ APEX TERMINAL LIVE FEED &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🟢 PROFESSIONAL INTERACTIVE CHARTS ACTIVE &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🚀 TASE & US TOP 10 SCANNER
-        </div>
-    </div>
-""", unsafe_allow_html=True)
-
 US_STOCKS = {
     "NVDA": {"name": "NVIDIA Corp.", "currency": "$", "fallback": 125.0, "fixed_score": 10},
     "MSFT": {"name": "Microsoft Corp.", "currency": "$", "fallback": 430.0, "fixed_score": 9},
@@ -84,6 +76,11 @@ def check_password():
         return False
     return True
 
+def get_historical_data(ticker, period):
+    t = yf.Ticker(ticker)
+    df = t.history(period=period, auto_adjust=True)
+    return df
+
 def analyze_stock(ticker, info, market_type):
     prefix = info["currency"]
     name = info["name"]
@@ -92,9 +89,7 @@ def analyze_stock(ticker, info, market_type):
     fixed_score = info.get("fixed_score", 8)
     
     try:
-        t = yf.Ticker(ticker)
-        df = t.history(period="3mo", auto_adjust=True)
-        
+        df = get_historical_data(ticker, "1y")
         if df.empty or len(df) < 5:
             raise ValueError("Empty data")
 
@@ -102,7 +97,6 @@ def analyze_stock(ticker, info, market_type):
         if pd.isna(raw_price):
             raise ValueError("NaN price")
 
-        # תיקון המרה למניות בבורסת תל אביב שנסחרות באגורות
         if market_type == "TASE" and raw_price > 300 and ticker not in ["NICE.TA", "ESLT.TA"]:
             df['Close'] = df['Close'] / 100.0
             if 'Open' in df.columns: df['Open'] = df['Open'] / 100.0
@@ -123,10 +117,10 @@ def analyze_stock(ticker, info, market_type):
         }
     except Exception:
         base = fallback
-        dates = pd.date_range(end=pd.Timestamp.today(), periods=60, freq='B')
+        dates = pd.date_range(end=pd.Timestamp.today(), periods=250, freq='B')
         import random
         random.seed(42)
-        simulated_prices = [base * (1 + random.uniform(-0.015, 0.02)) for _ in range(60)]
+        simulated_prices = [base * (1 + random.uniform(-0.015, 0.02)) for _ in range(250)]
         df_dummy = pd.DataFrame({'Close': simulated_prices}, index=dates)
         
         disp_price = f"{prefix}{base:,.2f}"
@@ -141,26 +135,64 @@ def analyze_stock(ticker, info, market_type):
             "reasons": ["תבנית היפוך שורית זוהתה", "תמיכה חזקה בטווח הקצר"]
         }
 
-def plot_pro_chart(df, ticker_name, prefix):
+def plot_clean_investing_chart(df, ticker_name, prefix, period_key):
+    # סינון הנתונים לפי טווח הזמן שנבחר
+    if period_key == "1D":
+        chart_df = df.tail(2)
+    elif period_key == "1W":
+        chart_df = df.tail(7)
+    elif period_key == "1M":
+        chart_df = df.tail(30)
+    elif period_key == "1Y":
+        chart_df = df.tail(252)
+    else: # 5Y או מקס
+        chart_df = df
+
+    last_price = float(chart_df['Close'].iloc[-1])
+
     fig = go.Figure()
+    
+    # קו המחיר הראשי בצבע תכלת נקי
     fig.add_trace(go.Scatter(
-        x=df.index, y=df['Close'],
+        x=chart_df.index, y=chart_df['Close'],
         mode='lines',
         name='מחיר',
-        line=dict(color='#38bdf8', width=2),
+        line=dict(color='#0ea5e9', width=2),
         fill='tozeroy',
-        fillcolor='rgba(56, 189, 248, 0.15)',
+        fillcolor='rgba(14, 165, 233, 0.08)',
         hovertemplate=f"תאריך: %{{x|%d/%m/%Y}}<br>מחיר: {prefix}%{{y:,.2f}}<extra></extra>"
     ))
 
+    # הוספת קו אופקי מקווקו למחיר האחרון (בדיוק כמו באפליקציות מסחר)
+    fig.add_hline(
+        y=last_price, 
+        line_dash="dash", 
+        line_color="#64748b", 
+        line_width=1,
+        annotation_text=f"<b>{prefix}{last_price:,.2f}</b>",
+        annotation_position="right",
+        annotation_font=dict(color="#ffffff", size=11, family="Segoe UI"),
+        annotation_bgcolor="#0ea5e9"
+    )
+
     fig.update_layout(
-        title=dict(text=f"גרף מסחר אינטראקטיבי: {ticker_name}", font=dict(color="#f3f4f6", size=13, family="Segoe UI")),
         hovermode="x unified",
-        margin=dict(l=10, r=10, t=35, b=10),
-        height=300,
+        margin=dict(l=10, r=60, t=20, b=10),
+        height=280,
         showlegend=False,
-        xaxis=dict(showgrid=True, gridcolor='#1f2937', tickfont=dict(color='#9ca3af', size=10)),
-        yaxis=dict(showgrid=True, gridcolor='#1f2937', tickfont=dict(color='#9ca3af', size=10), autorange=True),
+        xaxis=dict(
+            showgrid=True, 
+            gridcolor='rgba(255, 255, 255, 0.04)', 
+            tickfont=dict(color='#94a3b8', size=10),
+            showline=False
+        ),
+        yaxis=dict(
+            showgrid=True, 
+            gridcolor='rgba(255, 255, 255, 0.04)', 
+            tickfont=dict(color='#94a3b8', size=10),
+            side='right', # מציג את המספרים בצד ימין כמו ב-Investing
+            autorange=True
+        ),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)'
     )
@@ -181,7 +213,29 @@ def render_stock_expander(row, is_tase=False, rank_prefix=""):
             for rsn in row['reasons']:
                 st.markdown(f"- {rsn}")
         with c2:
-            fig = plot_pro_chart(row['df'], row['name'], row['prefix'])
+            # הוספת כפתורי בחירת טווח זמן נקיים ממש כמו באפליקציה
+            time_cols = st.columns(6)
+            periods = ["1D", "1W", "1M", "1Y", "5Y", "Max"]
+            
+            # שמירת הסטייט לפי סימבול המניה
+            state_key = f"period_{row['ticker']}"
+            if state_key not in st.session_state:
+                st.session_state[state_key] = "1M"
+
+            selected_p = st.session_state[state_key]
+            
+            # יצירת כפתורי תצוגה קטנים
+            p_map = {"1D": "1D", "1W": "1W", "1M": "1M", "1Y": "1Y", "5Y": "5Y", "Max": "מקס"}
+            
+            cols_p = st.columns(6)
+            for i, p_code in enumerate(periods):
+                with cols_p[i]:
+                    btn_type = "primary" if selected_p == p_code else "secondary"
+                    if st.button(p_map[p_code], key=f"btn_{row['ticker']}_{p_code}", use_container_width=True):
+                        st.session_state[state_key] = p_code
+                        st.rerun()
+
+            fig = plot_clean_investing_chart(row['df'], row['name'], row['prefix'], st.session_state[state_key])
             st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
 if check_password():
@@ -233,7 +287,6 @@ if check_password():
     with main_tab1:
         st.markdown("<div class='section-box'>", unsafe_allow_html=True)
         st.markdown("### 🇮🇱 מניות ישראליות - 10 המניות החזקות בבורסת תל אביב")
-        st.markdown("<p style='color: #9ca3af; font-size: 13px;'>סקירה מקיפה הכוללת את מניות הבנקים, דלק, אלביט, בזק ועוד לפי ניתוחי שערים.</p>", unsafe_allow_html=True)
         
         if st.session_state["tase_results"]:
             tase_df = pd.DataFrame(st.session_state["tase_results"])
@@ -248,7 +301,6 @@ if check_password():
 
         st.markdown("<div class='section-box'>", unsafe_allow_html=True)
         st.markdown("### 🇺🇸 מניות אמריקאיות - 10 המניות החזקות בוול סטריט")
-        st.markdown("<p style='color: #9ca3af; font-size: 13px;'>סקירת ענקיות הטכנולוגיה והמדדים המובילים בארצות הברית עם איתותי קנייה ומגמות.</p>", unsafe_allow_html=True)
         
         if st.session_state["us_results"]:
             us_df = pd.DataFrame(st.session_state["us_results"])
