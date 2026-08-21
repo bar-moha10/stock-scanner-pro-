@@ -22,6 +22,7 @@ st.markdown("""
     .stTabs [aria-selected="true"] { background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important; color: #ffffff !important; box-shadow: 0 4px 15px rgba(37,99,235,0.4); }
     div.stButton > button { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border-radius: 10px; font-weight: 700; border: none; padding: 12px 24px; box-shadow: 0 4px 15px rgba(16,185,129,0.3); transition: all 0.3s ease; }
     div.stButton > button:hover { opacity: 0.95; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16,185,129,0.5); }
+    .section-box { background: #0b0f19; border: 1px solid #1f2937; padding: 20px; border-radius: 16px; margin-bottom: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
     </style>
 """, unsafe_allow_html=True)
 
@@ -228,7 +229,7 @@ if check_password():
         st.session_state["global_portfolio"] = []
 
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🚀 טען והפעל סריקה של 10 המניות המובילות בכל שוק", use_container_width=True):
+    if st.button("🚀 טען והפעל סריקה של כל המניות המובילות בשווקים", use_container_width=True):
         us_res, tase_res = [], []
         progress_bar = st.progress(0)
         total_tasks = len(US_STOCKS) + len(TASE_STOCKS)
@@ -250,86 +251,103 @@ if check_password():
         
         st.session_state["us_results"] = sorted(us_res, key=lambda x: x['score'], reverse=True)
         st.session_state["tase_results"] = sorted(tase_res, key=lambda x: x['score'], reverse=True)
-        st.success("הנתונים נטענו בהצלחה! 10 המניות החזקות ביותר בכל שוק מוכנות.")
+        st.success("הנתונים נטענו בהצלחה עבור כל השווקים!")
 
-    if st.session_state["us_results"] or st.session_state["tase_results"]:
-        st.markdown("<br>", unsafe_allow_html=True)
-        main_tab1, main_tab2, main_tab3 = st.tabs([
-            "🇺🇸 10 מניות וול סטריט המובילות", 
-            "🇮🇱 10 מניות תל אביב המובילות", 
-            "💼 תיק השקעות וניהול סיכונים"
-        ])
+    st.markdown("<br>", unsafe_allow_html=True)
+    main_tab1, main_tab2 = st.tabs([
+        "📊 סורק שווקים ראשי (ישראליות ואמריקאיות)", 
+        "💼 תיק השקעות וניהול סיכונים"
+    ])
 
-        with main_tab1:
-            st.markdown("### 🇺🇸 10 המניות החזקות ביותר בארצות הברית")
-            us_df = pd.DataFrame(st.session_state["us_results"])
-            if not us_df.empty:
-                for idx, row in us_df.iterrows():
-                    medal = "🥇" if idx == 0 else "🥈" if idx == 1 else "🥉" if idx == 2 else f"#{idx+1}"
-                    render_stock_expander(row, is_tase=False, rank_prefix=medal)
-
-        with main_tab2:
-            st.markdown("### 🇮🇱 10 המניות החזקות ביותר בבורסת תל אביב")
+    with main_tab1:
+        # רובריקה ראשונה: מניות ישראליות
+        st.markdown("<div class='section-box'>", unsafe_allow_html=True)
+        st.markdown("### 🇮🇱 מניות ישראליות - 10 המניות החזקות בבורסת תל אביב")
+        st.markdown("<p style='color: #9ca3af; font-size: 13px;'>סקירה מקיפה הכוללת את מניות הבנקים, דלק, אלביט, בזק ועוד לפי ניתוחי שערים ונרות יפניים.</p>", unsafe_allow_html=True)
+        
+        if st.session_state["tase_results"]:
             tase_df = pd.DataFrame(st.session_state["tase_results"])
-            if not tase_df.empty:
-                for idx, row in tase_df.iterrows():
-                    medal = "🥇" if idx == 0 else "🥈" if idx == 1 else "🥉" if idx == 2 else f"#{idx+1}"
-                    render_stock_expander(row, is_tase=True, rank_prefix=medal)
+            for idx, row in tase_df.iterrows():
+                medal = "🥇" if idx == 0 else "🥈" if idx == 1 else "🥉" if idx == 2 else f"#{idx+1}"
+                render_stock_expander(row, is_tase=True, rank_prefix=medal)
+        else:
+            st.info("לחץ למעלה על כפתור הטעינה כדי להציג את נתוני מניות תל אביב.")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        with main_tab3:
-            st.markdown("### 💼 ניהול תיק השקעות מתקדם")
-            all_available_stocks = st.session_state["us_results"] + st.session_state["tase_results"]
-            
-            with st.form("global_trade_form"):
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # רובריקה שנייה: מניות אמריקאיות
+        st.markdown("<div class='section-box'>", unsafe_allow_html=True)
+        st.markdown("### 🇺🇸 מניות אמריקאיות - 10 המניות החזקות בוול סטריט")
+        st.markdown("<p style='color: #9ca3af; font-size: 13px;'>סקירת ענקיות הטכנולוגיה והמדדים המובילים בארצות הברית עם איתותי קנייה ומגמות.</p>", unsafe_allow_html=True)
+        
+        if st.session_state["us_results"]:
+            us_df = pd.DataFrame(st.session_state["us_results"])
+            for idx, row in us_df.iterrows():
+                medal = "🥇" if idx == 0 else "🥈" if idx == 1 else "🥉" if idx == 2 else f"#{idx+1}"
+                render_stock_expander(row, is_tase=False, rank_prefix=medal)
+        else:
+            st.info("לחץ למעלה על כפתור הטעינה כדי להציג את נתוני מניות וול סטריט.")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with main_tab2:
+        st.markdown("### 💼 ניהול תיק השקעות מתקדם")
+        all_available_stocks = st.session_state["us_results"] + st.session_state["tase_results"]
+        
+        with st.form("global_trade_form"):
+            if all_available_stocks:
                 ticker_opts = {f"{r['name']} ({r['ticker']})": r for r in all_available_stocks}
                 selected_label = st.selectbox("בחר מניה לביצוע פעולת רכישה", list(ticker_opts.keys()))
                 selected_data = ticker_opts[selected_label]
-
-                col_f1, col_f2 = st.columns(2)
-                with col_f1:
-                    shares_cnt = st.number_input("כמות יחידות לרכישה", min_value=1, value=100)
-                with col_f2:
-                    buy_p = st.number_input(f"מחיר קנייה מבוקש ({selected_data['prefix']})", min_value=0.01, value=float(selected_data['price']), format="%.2f")
-
-                submitted = st.form_submit_button("➕ בצע פקודת רכישה והוסף לתיק", use_container_width=True)
-                if submitted:
-                    st.session_state["global_portfolio"].append({
-                        "ticker": selected_data["ticker"], "name": selected_data["name"],
-                        "prefix": selected_data["prefix"], "shares": shares_cnt, "buy_price": buy_p
-                    })
-                    st.success("הפקודה בוצעה בהצלחה ונוספה לתיק!")
-                    st.rerun()
-
-            st.markdown("---")
-            st.markdown("### 📊 סיכום שווי תיק וביצועים בזמן אמת")
-            if not st.session_state["global_portfolio"]:
-                st.info("התיק שלך ריק כרגע. בחר מניה למעלה והכנס פוזיציה ראשונה.")
             else:
-                port_rows = []
-                all_dict = {r["ticker"]: r for r in all_available_stocks}
+                selected_data = None
+                st.warning("יש לטעון נתונים תחילה כדי לרכוש מניות לתיק.")
+
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                shares_cnt = st.number_input("כמות יחידות לרכישה", min_value=1, value=100)
+            with col_f2:
+                default_p = float(selected_data['price']) if selected_data else 10.0
+                pref_sign = selected_data['prefix'] if selected_data else "$"
+                buy_p = st.number_input(f"מחיר קנייה מבוקש ({pref_sign})", min_value=0.01, value=default_p, format="%.2f")
+
+            submitted = st.form_submit_button("➕ בצע פקודת רכישה והוסף לתיק", use_container_width=True)
+            if submitted and selected_data:
+                st.session_state["global_portfolio"].append({
+                    "ticker": selected_data["ticker"], "name": selected_data["name"],
+                    "prefix": selected_data["prefix"], "shares": shares_cnt, "buy_price": buy_p
+                })
+                st.success("הפקודה בוצעה בהצלחה ונוספה לתיק!")
+                st.rerun()
+
+        st.markdown("---")
+        st.markdown("### 📊 סיכום שווי תיק וביצועים בזמן אמת")
+        if not st.session_state["global_portfolio"]:
+            st.info("התיק שלך ריק כרגע. בחר מניה למעלה והכנס פוזיציה ראשונה.")
+        else:
+            port_rows = []
+            all_dict = {r["ticker"]: r for r in all_available_stocks}
+            
+            for tr in st.session_state["global_portfolio"]:
+                tk = tr["ticker"]
+                shs = tr["shares"]
+                b_price = tr["buy_price"]
+                pref = tr["prefix"]
                 
-                for tr in st.session_state["global_portfolio"]:
-                    tk = tr["ticker"]
-                    shs = tr["shares"]
-                    b_price = tr["buy_price"]
-                    pref = tr["prefix"]
-                    
-                    curr_p = all_dict[tk]["price"] if tk in all_dict else b_price
-                    invested_val = shs * b_price
-                    current_val = shs * curr_p
-                    pnl = current_val - invested_val
-                    pnl_pct = ((curr_p - b_price) / b_price) * 100 if b_price > 0 else 0
+                curr_p = all_dict[tk]["price"] if tk in all_dict else b_price
+                invested_val = shs * b_price
+                current_val = shs * curr_p
+                pnl = current_val - invested_val
+                pnl_pct = ((curr_p - b_price) / b_price) * 100 if b_price > 0 else 0
 
-                    port_rows.append({
-                        "שם המניה": tr["name"], "סימבול": tk, "כמות": shs,
-                        "מחיר קנייה": f"{pref}{b_price:,.2f}", "מחיר נוכחי": f"{pref}{curr_p:,.2f}",
-                        "שווי נוכחי": f"{pref}{current_val:,.2f}", "רווח/הפסד": f"{pref}{pnl:+,.2f}",
-                        "תשואה (%)": f"{pnl_pct:+,.2f}%"
-                    })
+                port_rows.append({
+                    "שם המניה": tr["name"], "סימבול": tk, "כמות": shs,
+                    "מחיר קנייה": f"{pref}{b_price:,.2f}", "מחיר נוכחי": f"{pref}{curr_p:,.2f}",
+                    "שווי נוכחי": f"{pref}{current_val:,.2f}", "רווח/הפסד": f"{pref}{pnl:+,.2f}",
+                    "תשואה (%)": f"{pnl_pct:+,.2f}%"
+                })
 
-                st.dataframe(pd.DataFrame(port_rows), use_container_width=True)
-                if st.button("🗑️ אפס ונקה את התיק"):
-                    st.session_state["global_portfolio"] = []
-                    st.rerun()
-    else:
-        st.info("👈 לחץ על כפתור 'טען והפעל סריקה של 10 המניות המובילות בכל שוק' כדי להציג את הרשימות.")
+            st.dataframe(pd.DataFrame(port_rows), use_container_width=True)
+            if st.button("🗑️ אפס ונקה את התיק"):
+                st.session_state["global_portfolio"] = []
+                st.rerun()
