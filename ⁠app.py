@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 st.set_page_config(
-    page_title="Stock Scanner Pro", 
+    page_title="Stock Scanner Pro - Ultimate", 
     page_icon="📈", 
     layout="wide",
     initial_sidebar_state="expanded"
@@ -20,6 +20,12 @@ st.markdown("""
         width: 100%;
         border-radius: 8px;
         font-weight: bold;
+    }
+    .metric-card {
+        background-color: #161b22;
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid #30363d;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -199,8 +205,18 @@ def plot_interactive_chart(df, ticker, prefix):
     return fig
 
 if check_password():
-    st.title("📈 Stock Scanner Pro - Top 10")
+    st.title("📈 Stock Scanner Pro - המרכז הפיננסי המתקדם")
     
+    # אזור הסברים אינטראקטיביים (כפי שביקשת שנדאג שיהיה ברור מה כל דבר עושה)
+    with st.expander("📖 מדריך מהיר למשתמש ולמושגי המערכת (לחץ כאן להסבר על הנתונים)"):
+        st.markdown("""
+        * **🏆 עסקאות זהב (Top):** המניות המובילות בשוק שעברו סינון קפדני לפי עוצמה טכנית, מחזור מסחר ומומנטום חיובי.
+        * **RVOL (Relative Volume):** נפח מסחר יחסי. ערך מעל 1.0 מעיד על עניין חריג של קונים ומוכרים במניה היום.
+        * **RSI (Relative Strength Index):** מדד עוצמה יחסית. נע בין 0 ל-100. ערך סביב 50-65 מעיד על מומנטום שורי בריא שאינו נמצא עדיין במצב קיצוני מדי.
+        * **סטופ לוס (Stop Loss):** נקודת יציאה מומלצת להגבלת הפסד במקרה שהטרייד הפוך לכיוון המצופה.
+        * **מחיר יעד (Target Price):** רמת המחיר הצפויה למימוש רווחים על סמך ניתוח תבניות מחיר.
+        """)
+
     if "virtual_portfolio" not in st.session_state:
         st.session_state["virtual_portfolio"] = []
 
