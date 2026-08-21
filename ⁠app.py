@@ -136,7 +136,6 @@ def calculate_score_and_recommendation(pattern_type, rsi, ratio, ma50, ma200, cu
         reasons.append("תבנית נרות שורית")
 
     final_score = max(1, min(10, score_points))
-    is_golden_trade = final_score >= 8
 
     if final_score >= 8:
         rec_title = f"🏆 עסקת זהב ({final_score}/10)"
@@ -147,7 +146,7 @@ def calculate_score_and_recommendation(pattern_type, rsi, ratio, ma50, ma200, cu
     else:
         rec_title = f"🔴 חלש ({final_score}/10)"
 
-    return rec_title, final_score, is_golden_trade, reasons
+    return rec_title, final_score, reasons
 
 def analyze_single_ticker(ticker):
     try:
@@ -159,8 +158,8 @@ def analyze_single_ticker(ticker):
         is_israeli = ticker.endswith(".TA")
         raw_price = float(df['Close'].iloc[-1])
 
-        # תיקון חכם למניעת NaN והמרת אגורות לשקלים במידת הצורך
-        if is_israeli and raw_price > 500:
+        # זיהוי מדויק האם המחיר ב-Yahoo מדווח באגורות (לרוב מעל 200 עבור מניות שנסחרות בשקלים בודדים)
+        if is_israeli and raw_price > 200:
             calc_price = raw_price / 100.0
             df[['Open', 'High', 'Low', 'Close']] = df[['Open', 'High', 'Low', 'Close']] / 100.0
         else:
@@ -208,9 +207,11 @@ def analyze_single_ticker(ticker):
         risk_pct = round(((calc_price - stop_loss) / calc_price) * 100, 2)
         ratio = round(pot_gain / risk_pct, 2) if risk_pct > 0 else 0.0
 
-        rec_title, score_10, is_golden, reasons = calculate_score_and_recommendation(
+        rec_title, score_10, reasons = calculate_score_and_recommendation(
             pattern_type, rsi, ratio, ma50_val, ma200_val, calc_price, rvol
         )
+
+        is_golden = score_10 >= 8
 
         return {
             "מניה": ticker,
@@ -232,7 +233,7 @@ def analyze_single_ticker(ticker):
             "df": df.tail(120),
             "prefix": prefix
         }
-    except Exception as e:
+    except Exception:
         return None
 
 def plot_interactive_chart(df, ticker, prefix):
@@ -312,6 +313,7 @@ if check_password():
 
         with tab_il:
             st.subheader("10 המניות החזקות ביותר בבורסת תל אביב")
+            # מיון לפי הציון הגבוה ביותר קודם (descending), כדי שהחזקות יופיעו למעלה
             df_il = df_all[df_all["מניה"].str.endswith(".TA")].sort_values(
                 by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]
             ).head(10).reset_index(drop=True)
@@ -321,7 +323,7 @@ if check_password():
             else:
                 for idx, row in df_il.iterrows():
                     badge = "🏆" if row['עסקת זהב'] else "📌"
-                    title_text = f"{badge} #{idx+1} | {row['שם תצוגה']} ({row['מספר נייר']} / {row['מניה']})"
+                    title_text = f"{badge} #{idx+1} | {row['שם תצוגה']} ({row['מספר נייר']} / {row['מניה']}) — ציון: {row['ציון']}/10"
                     
                     with st.expander(title_text):
                         c1, c2 = st.columns([1, 1.5])
@@ -351,7 +353,7 @@ if check_password():
             else:
                 for idx, row in df_us.iterrows():
                     badge = "🏆" if row['עסקת זהב'] else "📌"
-                    title_text = f"{badge} #{idx+1} | {row['מניה']}"
+                    title_text = f"{badge} #{idx+1} | {row['מניה']} — ציון: {row['ציון']}/10"
 
                     with st.expander(title_text):
                         c1, c2 = st.columns([1, 1.5])
@@ -474,4 +476,4 @@ if check_password():
                     st.session_state["virtual_portfolio"] = []
                     st.rerun()
     else:
-        st.info("👈 לחץ על כפתור **'הפעל סריקת שוק מלאה עכשיו'** כדי לטעון מחדש את הנתונים ללא שגיאות NaN.")
+        st.info("👈 לחץ על כפתור **'הפעל סריקת שוק מלאה עכשיו'** כדי לטעון מחדש את הנתונים המדויקים.")
