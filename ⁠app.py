@@ -99,7 +99,7 @@ def check_password():
 
 def detect_candlestick_pattern(df):
     if len(df) < 2:
-        return "אין מספיק נתונים", "neutral", "אין מספיק נתוני מסחר."
+        return "🕯️ נר רגיל", "neutral", "אין מספיק נתוני מסחר."
     curr, prev = df.iloc[-1], df.iloc[-2]
     c_open, c_close, c_high, c_low = curr['Open'], curr['Close'], curr['High'], curr['Low']
     p_open, p_close = prev['Open'], prev['Close']
@@ -116,7 +116,7 @@ def detect_candlestick_pattern(df):
         return ("🕯️ נר אדום רגיל", "neutral", "סגירה שלילית.")
 
 def calculate_score_and_recommendation(pattern_type, rsi, ratio, ma50, ma200, current_price, rvol):
-    score_points = 0
+    score_points = 5  # ציון ברירת מחדל התחלתי כדי לא להפיל מיד לאחד
     reasons = []
 
     if ma50 is not None and current_price > ma50:
@@ -125,14 +125,11 @@ def calculate_score_and_recommendation(pattern_type, rsi, ratio, ma50, ma200, cu
     if ma200 is not None and current_price > ma200:
         score_points += 1
         reasons.append("מעל ממוצע נע 200")
-    if rvol >= 1.2:
+    if rvol >= 1.1:
         score_points += 1
         reasons.append(f"נפח מסחר ער (RVOL {rvol:.1f}x)")
-    if ratio >= 1.5:
-        score_points += 1
-        reasons.append(f"יחס סיכוי/סיכון טוב ({ratio}:1)")
     if pattern_type == "bullish":
-        score_points += 2
+        score_points += 1
         reasons.append("תבנית נרות שורית")
 
     final_score = max(1, min(10, score_points))
@@ -152,7 +149,7 @@ def analyze_single_ticker(ticker):
     try:
         t = yf.Ticker(ticker)
         df = t.history(period="6mo", auto_adjust=True)
-        if df.empty or len(df) < 30:
+        if df.empty or len(df) < 5:
             return None
 
         is_israeli = ticker.endswith(".TA")
@@ -161,15 +158,12 @@ def analyze_single_ticker(ticker):
         if pd.isna(raw_price) or raw_price <= 0:
             return None
 
-        # טיפול מדויק באגורות מול שקלים
+        # המרת אגורות לשקלים במידת הצורך
         if is_israeli and raw_price > 200:
             calc_price = raw_price / 100.0
             df[['Open', 'High', 'Low', 'Close']] = df[['Open', 'High', 'Low', 'Close']] / 100.0
         else:
             calc_price = raw_price
-
-        if pd.isna(calc_price) or calc_price <= 0:
-            return None
 
         display_price = f"₪{calc_price:.2f}" if is_israeli else f"${calc_price:.2f}"
         prefix = "₪" if is_israeli else "$"
@@ -185,12 +179,12 @@ def analyze_single_ticker(ticker):
         df['MA50'] = df['Close'].rolling(50).mean()
         df['MA200'] = df['Close'].rolling(200).mean()
         
-        ma50_val = float(df['MA50'].iloc[-1]) if not pd.isna(df['MA50'].iloc[-1]) else None
-        ma200_val = float(df['MA200'].iloc[-1]) if not pd.isna(df['MA200'].iloc[-1]) else None
+        ma50_val = float(df['MA50'].iloc[-1]) if len(df) >= 50 and not pd.isna(df['MA50'].iloc[-1]) else None
+        ma200_val = float(df['MA200'].iloc[-1]) if len(df) >= 200 and not pd.isna(df['MA200'].iloc[-1]) else None
 
-        recent_vol = df['Volume'].iloc[-1]
-        avg_vol_20 = df['Volume'].tail(20).mean()
-        rvol = float(recent_vol / avg_vol_20) if avg_vol_20 > 0 and not pd.isna(avg_vol_20) else 1.0
+        recent_vol = float(df['Volume'].iloc[-1]) if 'Volume' in df.columns else 0
+        avg_vol_20 = float(df['Volume'].tail(20).mean()) if 'Volume' in df.columns and len(df) >= 20 else 1.0
+        rvol = float(recent_vol / avg_vol_20) if avg_vol_20 > 0 else 1.0
 
         candle_pattern, pattern_type, candle_desc = detect_candlestick_pattern(df)
 
@@ -204,14 +198,14 @@ def analyze_single_ticker(ticker):
         high_low_diff = df['High'] - df['Low']
         atr_series = high_low_diff.rolling(14).mean()
         atr = float(atr_series.iloc[-1]) if not atr_series.empty and not pd.isna(atr_series.iloc[-1]) else (calc_price * 0.02)
-        if atr <= 0 or pd.isna(atr):
+        if pd.isna(atr) or atr <= 0:
             atr = calc_price * 0.02
 
         stop_loss = round(calc_price - (1.5 * atr), 2)
         target = round(calc_price + (3.0 * atr), 2)
         pot_gain = round(((target - calc_price) / calc_price) * 100, 2)
         risk_pct = round(((calc_price - stop_loss) / calc_price) * 100, 2)
-        ratio = round(pot_gain / risk_pct, 2) if risk_pct > 0 else 0.0
+        ratio = round(pot_gain / risk_pct, 2) if risk_pct > 0 else 1.5
 
         rec_title, score_10, reasons = calculate_score_and_recommendation(
             pattern_type, rsi, ratio, ma50_val, ma200_val, calc_price, rvol
@@ -239,7 +233,7 @@ def analyze_single_ticker(ticker):
             "df": df.tail(120),
             "prefix": prefix
         }
-    except Exception:
+    except Exception as e:
         return None
 
 def plot_interactive_chart(df, ticker, prefix):
@@ -289,7 +283,7 @@ if check_password():
         status_text.text("סורק את השוק...")
 
         completed = 0
-        with ThreadPoolExecutor(max_workers=20) as executor:
+        with ThreadPoolExecutor(max_workers=10) as executor:
             future_to_ticker = {executor.submit(analyze_single_ticker, t): t for t in total_tickers}
             for future in as_completed(future_to_ticker):
                 res = future.result()
@@ -319,12 +313,12 @@ if check_password():
 
         with tab_il:
             st.subheader("10 המניות החזקות ביותר בבורסת תל אביב")
-            # סינון כפול לוודא שאין NaN במחיר או בציון, ומיון מהחזק לחלש
-            df_il = df_all[df_all["מניה"].str.endswith(".TA")].dropna(subset=["מחיר מספרי", "ציון"])
-            df_il = df_il.sort_values(by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]).head(10).reset_index(drop=True)
+            df_il = df_all[df_all["מניה"].str.endswith(".TA")].sort_values(
+                by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]
+            ).head(10).reset_index(drop=True)
 
             if df_il.empty:
-                st.info("אין מספיק נתונים תקינים כרגע למניות ישראל.")
+                st.info("אין נתונים זמינים כרגע למניות ישראל. נסה להפעיל שוב את הסריקה.")
             else:
                 for idx, row in df_il.iterrows():
                     badge = "🏆" if row['עסקת זהב'] else "📌"
@@ -349,11 +343,12 @@ if check_password():
 
         with tab_us:
             st.subheader("10 המניות החזקות ביותר בבורסת ארה\"ב")
-            df_us = df_all[~df_all["מניה"].str.endswith(".TA")].dropna(subset=["מחיר מספרי", "ציון"])
-            df_us = df_us.sort_values(by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]).head(10).reset_index(drop=True)
+            df_us = df_all[~df_all["מניה"].str.endswith(".TA")].sort_values(
+                by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]
+            ).head(10).reset_index(drop=True)
 
             if df_us.empty:
-                st.info("אין מספיק נתונים תקינים כרגע למניות ארה\"ב.")
+                st.info("אין מספיק נתונים כרגע למניות ארה\"ב.")
             else:
                 for idx, row in df_us.iterrows():
                     badge = "🏆" if row['עסקת זהב'] else "📌"
@@ -475,7 +470,7 @@ if check_password():
                 col_m2.metric("שווי נוכחי של התיק", f"{total_current_value:,.2f}")
                 col_m3.metric("רווח / הפסד כולל", f"{total_pnl:+,.2f}", f"{total_pnl_pct:+.2f}%")
 
-                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_angle_html=True) if hasattr(st, 'markdown') else None
                 if st.button("🗑️ נקה את כל התיק"):
                     st.session_state["virtual_portfolio"] = []
                     st.rerun()
