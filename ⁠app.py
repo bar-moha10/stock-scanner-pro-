@@ -158,12 +158,18 @@ def analyze_single_ticker(ticker):
         is_israeli = ticker.endswith(".TA")
         raw_price = float(df['Close'].iloc[-1])
 
-        # זיהוי מדויק האם המחיר ב-Yahoo מדווח באגורות (לרוב מעל 200 עבור מניות שנסחרות בשקלים בודדים)
+        if pd.isna(raw_price) or raw_price <= 0:
+            return None
+
+        # טיפול מדויק באגורות מול שקלים
         if is_israeli and raw_price > 200:
             calc_price = raw_price / 100.0
             df[['Open', 'High', 'Low', 'Close']] = df[['Open', 'High', 'Low', 'Close']] / 100.0
         else:
             calc_price = raw_price
+
+        if pd.isna(calc_price) or calc_price <= 0:
+            return None
 
         display_price = f"₪{calc_price:.2f}" if is_israeli else f"${calc_price:.2f}"
         prefix = "₪" if is_israeli else "$"
@@ -184,7 +190,7 @@ def analyze_single_ticker(ticker):
 
         recent_vol = df['Volume'].iloc[-1]
         avg_vol_20 = df['Volume'].tail(20).mean()
-        rvol = float(recent_vol / avg_vol_20) if avg_vol_20 > 0 else 1.0
+        rvol = float(recent_vol / avg_vol_20) if avg_vol_20 > 0 and not pd.isna(avg_vol_20) else 1.0
 
         candle_pattern, pattern_type, candle_desc = detect_candlestick_pattern(df)
 
@@ -198,7 +204,7 @@ def analyze_single_ticker(ticker):
         high_low_diff = df['High'] - df['Low']
         atr_series = high_low_diff.rolling(14).mean()
         atr = float(atr_series.iloc[-1]) if not atr_series.empty and not pd.isna(atr_series.iloc[-1]) else (calc_price * 0.02)
-        if atr <= 0:
+        if atr <= 0 or pd.isna(atr):
             atr = calc_price * 0.02
 
         stop_loss = round(calc_price - (1.5 * atr), 2)
@@ -313,13 +319,12 @@ if check_password():
 
         with tab_il:
             st.subheader("10 המניות החזקות ביותר בבורסת תל אביב")
-            # מיון לפי הציון הגבוה ביותר קודם (descending), כדי שהחזקות יופיעו למעלה
-            df_il = df_all[df_all["מניה"].str.endswith(".TA")].sort_values(
-                by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]
-            ).head(10).reset_index(drop=True)
+            # סינון כפול לוודא שאין NaN במחיר או בציון, ומיון מהחזק לחלש
+            df_il = df_all[df_all["מניה"].str.endswith(".TA")].dropna(subset=["מחיר מספרי", "ציון"])
+            df_il = df_il.sort_values(by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]).head(10).reset_index(drop=True)
 
             if df_il.empty:
-                st.info("אין מספיק נתונים כרגע למניות ישראל.")
+                st.info("אין מספיק נתונים תקינים כרגע למניות ישראל.")
             else:
                 for idx, row in df_il.iterrows():
                     badge = "🏆" if row['עסקת זהב'] else "📌"
@@ -344,12 +349,11 @@ if check_password():
 
         with tab_us:
             st.subheader("10 המניות החזקות ביותר בבורסת ארה\"ב")
-            df_us = df_all[~df_all["מניה"].str.endswith(".TA")].sort_values(
-                by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]
-            ).head(10).reset_index(drop=True)
+            df_us = df_all[~df_all["מניה"].str.endswith(".TA")].dropna(subset=["מחיר מספרי", "ציון"])
+            df_us = df_us.sort_values(by=["ציון", "פוטנציאל רווח (%)"], ascending=[False, False]).head(10).reset_index(drop=True)
 
             if df_us.empty:
-                st.info("אין מספיק נתונים כרגע למניות ארה\"ב.")
+                st.info("אין מספיק נתונים תקינים כרגע למניות ארה\"ב.")
             else:
                 for idx, row in df_us.iterrows():
                     badge = "🏆" if row['עסקת זהב'] else "📌"
