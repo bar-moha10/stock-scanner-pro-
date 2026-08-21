@@ -29,7 +29,7 @@ st.markdown("""
 st.markdown("""
     <div class="ticker-container">
         <div class="ticker-text">
-            ⚡ APEX TERMINAL LIVE FEED &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🟢 CLEAN AREA CHARTS ACTIVE &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🚀 TASE & US TOP 10 SCANNER &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🔥 REAL-TIME ALGORITHMIC ANALYSIS
+            ⚡ APEX TERMINAL LIVE FEED &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🟢 PROFESSIONAL INTERACTIVE CHARTS ACTIVE &nbsp;&nbsp;&bull;&nbsp;&nbsp; 🚀 TASE & US TOP 10 SCANNER
         </div>
     </div>
 """, unsafe_allow_html=True)
@@ -102,7 +102,14 @@ def analyze_stock(ticker, info, market_type):
         if pd.isna(raw_price):
             raise ValueError("NaN price")
 
-        calc_price = raw_price / 100.0 if (market_type == "TASE" and raw_price > 300 and ticker not in ["NICE.TA", "ESLT.TA"]) else raw_price
+        # תיקון המרה למניות בבורסת תל אביב שנסחרות באגורות
+        if market_type == "TASE" and raw_price > 300 and ticker not in ["NICE.TA", "ESLT.TA"]:
+            df['Close'] = df['Close'] / 100.0
+            if 'Open' in df.columns: df['Open'] = df['Open'] / 100.0
+            if 'High' in df.columns: df['High'] = df['High'] / 100.0
+            if 'Low' in df.columns: df['Low'] = df['Low'] / 100.0
+
+        calc_price = float(df['Close'].iloc[-1])
         disp_price = f"{prefix}{calc_price:,.2f}"
         targ_price = f"{prefix}{calc_price * 1.15:,.2f}"
         stop_price = f"{prefix}{calc_price * 0.94:,.2f}"
@@ -134,25 +141,26 @@ def analyze_stock(ticker, info, market_type):
             "reasons": ["תבנית היפוך שורית זוהתה", "תמיכה חזקה בטווח הקצר"]
         }
 
-def plot_clean_chart(df, ticker_name):
+def plot_pro_chart(df, ticker_name, prefix):
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=df.index, y=df['Close'],
         mode='lines',
-        name='מחיר סגירה',
-        line=dict(color='#38bdf8', width=2.5),
+        name='מחיר',
+        line=dict(color='#38bdf8', width=2),
         fill='tozeroy',
-        fillcolor='rgba(56, 189, 248, 0.1)'
+        fillcolor='rgba(56, 189, 248, 0.15)',
+        hovertemplate=f"תאריך: %{{x|%d/%m/%Y}}<br>מחיר: {prefix}%{{y:,.2f}}<extra></extra>"
     ))
 
     fig.update_layout(
-        title=dict(text=f"מגמת מחיר תקופתית: {ticker_name}", font=dict(color="#f3f4f6", size=13, family="Segoe UI")),
+        title=dict(text=f"גרף מסחר אינטראקטיבי: {ticker_name}", font=dict(color="#f3f4f6", size=13, family="Segoe UI")),
         hovermode="x unified",
         margin=dict(l=10, r=10, t=35, b=10),
-        height=280,
+        height=300,
         showlegend=False,
-        xaxis=dict(showgrid=False, tickfont=dict(color='#9ca3af', size=10)),
-        yaxis=dict(showgrid=True, gridcolor='#1f2937', tickfont=dict(color='#9ca3af', size=10)),
+        xaxis=dict(showgrid=True, gridcolor='#1f2937', tickfont=dict(color='#9ca3af', size=10)),
+        yaxis=dict(showgrid=True, gridcolor='#1f2937', tickfont=dict(color='#9ca3af', size=10), autorange=True),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)'
     )
@@ -173,7 +181,7 @@ def render_stock_expander(row, is_tase=False, rank_prefix=""):
             for rsn in row['reasons']:
                 st.markdown(f"- {rsn}")
         with c2:
-            fig = plot_clean_chart(row['df'], row['name'])
+            fig = plot_pro_chart(row['df'], row['name'], row['prefix'])
             st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
 if check_password():
