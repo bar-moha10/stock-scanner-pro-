@@ -210,10 +210,10 @@ if check_password():
     with st.sidebar:
         st.header("⚙️ בקרת מערכת")
         st.success("מחובר כמשתמש: **Shemi**")
-        run_scan_sidebar = st.button("🚀 הפעל סריקת שוק מלאה (צד)", type="primary")
+        run_scan_sidebar = st.button("🚀 הפעל סריקת שוק מלאה (צד)", type="primary", key="btn_sidebar")
 
     st.markdown("### 🔍 התחלת עבודה")
-    run_scan_main = st.button("🚀 הפעל סריקת שוק מלאה עכשיו", type="primary", use_container_width=True)
+    run_scan_main = st.button("🚀 הפעל סריקת שוק מלאה עכשיו", type="primary", use_container_width=True, key="btn_main")
 
     run_scan = run_scan_sidebar or run_scan_main
 
@@ -284,7 +284,7 @@ if check_password():
                                 st.info("💡 ניתוח טכני: " + " | ".join(row['נימוקים']))
                         with c2:
                             fig = plot_interactive_chart(histories_df[row['מניה']], row['מניה'], prefixes[row['מניה']])
-                            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+                            st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key=f"chart_gold_{row['מניה']}_{idx}")
 
         with tab_il:
             st.subheader("מניות בורסת תל אביב")
@@ -304,7 +304,7 @@ if check_password():
                         st.markdown(f"**סטופ לוס:** {row['סטופ לוס']}")
                     with c2:
                         fig = plot_interactive_chart(histories_df[row['מניה']], row['מניה'], prefixes[row['מניה']])
-                        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+                        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key=f"chart_il_{row['מניה']}_{idx}")
 
         with tab_us:
             st.subheader("מניות בורסת ארה\"ב")
@@ -324,7 +324,7 @@ if check_password():
                         st.markdown(f"**סטופ לוס:** {row['סטופ לוס']}")
                     with c2:
                         fig = plot_interactive_chart(histories_df[row['מניה']], row['מניה'], prefixes[row['מניה']])
-                        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+                        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key=f"chart_us_{row['מניה']}_{idx}")
 
         with tab_portfolio:
             st.subheader("💼 ניהול תיק השקעות וירטואלי")
@@ -403,7 +403,7 @@ if check_password():
                 df_port = pd.DataFrame(portfolio_rows)
                 st.dataframe(df_port.drop(columns=["raw_pnl"]), use_container_width=True)
 
-                if st.button("🗑️ נקה את כל התיק"):
+                if st.button("🗑️ נקה את כל התיק", key="btn_clear_portfolio"):
                     st.session_state["virtual_portfolio"] = []
                     st.rerun()
     else:
