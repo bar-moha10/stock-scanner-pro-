@@ -119,10 +119,10 @@ def calculate_score_and_recommendation(pattern_type, rsi, ratio, ma50, ma200, cu
     score_points = 0
     reasons = []
 
-    if current_price > ma50 if ma50 else False:
+    if ma50 is not None and current_price > ma50:
         score_points += 2
         reasons.append("מעל ממוצע נע 50")
-    if current_price > ma200 if ma200 else False:
+    if ma200 is not None and current_price > ma200:
         score_points += 1
         reasons.append("מעל ממוצע נע 200")
     if rvol >= 1.2:
@@ -152,35 +152,36 @@ def calculate_score_and_recommendation(pattern_type, rsi, ratio, ma50, ma200, cu
 def analyze_single_ticker(ticker):
     try:
         t = yf.Ticker(ticker)
-        df = t.history(period="6mo", auto_adjust=False)
+        df = t.history(period="6mo", auto_adjust=True)
         if df.empty or len(df) < 30:
             return None
 
         is_israeli = ticker.endswith(".TA")
         raw_price = float(df['Close'].iloc[-1])
 
+        # תיקון חכם למניעת NaN והמרת אגורות לשקלים במידת הצורך
+        if is_israeli and raw_price > 500:
+            calc_price = raw_price / 100.0
+            df[['Open', 'High', 'Low', 'Close']] = df[['Open', 'High', 'Low', 'Close']] / 100.0
+        else:
+            calc_price = raw_price
+
+        display_price = f"₪{calc_price:.2f}" if is_israeli else f"${calc_price:.2f}"
+        prefix = "₪" if is_israeli else "$"
+
         if is_israeli:
-            price_ils = raw_price / 100.0 if raw_price > 50 else raw_price
-            display_price = f"₪{price_ils:.2f}"
-            calc_price = price_ils
-            prefix = "₪"
-            if raw_price > 50:
-                df[['Open', 'High', 'Low', 'Close']] /= 100.0
-            
             stock_info = ISRAEL_STOCKS_INFO.get(ticker, {"name": ticker, "id": "לא ידוע"})
             display_name = stock_info["name"]
             stock_id = stock_info["id"]
         else:
-            display_price = f"${raw_price:.2f}"
-            calc_price = raw_price
-            prefix = "$"
             display_name = ticker
             stock_id = ticker
 
         df['MA50'] = df['Close'].rolling(50).mean()
         df['MA200'] = df['Close'].rolling(200).mean()
-        ma50_val = df['MA50'].iloc[-1] if not pd.isna(df['MA50'].iloc[-1]) else None
-        ma200_val = df['MA200'].iloc[-1] if not pd.isna(df['MA200'].iloc[-1]) else None
+        
+        ma50_val = float(df['MA50'].iloc[-1]) if not pd.isna(df['MA50'].iloc[-1]) else None
+        ma200_val = float(df['MA200'].iloc[-1]) if not pd.isna(df['MA200'].iloc[-1]) else None
 
         recent_vol = df['Volume'].iloc[-1]
         avg_vol_20 = df['Volume'].tail(20).mean()
@@ -192,17 +193,20 @@ def analyze_single_ticker(ticker):
         gain = (delta.where(delta > 0, 0)).rolling(14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
         rs = gain / loss
-        rsi = float((100 - (100 / (1 + rs))).iloc[-1]) if not loss.empty and loss.iloc[-1] != 0 else 50.0
+        rsi_series = 100 - (100 / (1 + rs))
+        rsi = float(rsi_series.iloc[-1]) if not rsi_series.empty and not pd.isna(rsi_series.iloc[-1]) else 50.0
 
-        atr = float((df['High'] - df['Low']).rolling(14).mean().iloc[-1])
-        if pd.isna(atr) or atr <= 0:
+        high_low_diff = df['High'] - df['Low']
+        atr_series = high_low_diff.rolling(14).mean()
+        atr = float(atr_series.iloc[-1]) if not atr_series.empty and not pd.isna(atr_series.iloc[-1]) else (calc_price * 0.02)
+        if atr <= 0:
             atr = calc_price * 0.02
 
         stop_loss = round(calc_price - (1.5 * atr), 2)
         target = round(calc_price + (3.0 * atr), 2)
         pot_gain = round(((target - calc_price) / calc_price) * 100, 2)
         risk_pct = round(((calc_price - stop_loss) / calc_price) * 100, 2)
-        ratio = round(pot_gain / risk_pct, 2) if risk_pct > 0 else 0
+        ratio = round(pot_gain / risk_pct, 2) if risk_pct > 0 else 0.0
 
         rec_title, score_10, is_golden, reasons = calculate_score_and_recommendation(
             pattern_type, rsi, ratio, ma50_val, ma200_val, calc_price, rvol
@@ -228,7 +232,7 @@ def analyze_single_ticker(ticker):
             "df": df.tail(120),
             "prefix": prefix
         }
-    except Exception:
+    except Exception as e:
         return None
 
 def plot_interactive_chart(df, ticker, prefix):
@@ -470,4 +474,4 @@ if check_password():
                     st.session_state["virtual_portfolio"] = []
                     st.rerun()
     else:
-        st.info("👈 לחץ על כפתור **'הפעל סריקת שוק מלאה עכשיו'** כדי לטעון את הנתונים ולנהל את התיק הווירטואלי.")
+        st.info("👈 לחץ על כפתור **'הפעל סריקת שוק מלאה עכשיו'** כדי לטעון מחדש את הנתונים ללא שגיאות NaN.")
